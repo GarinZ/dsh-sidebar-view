@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({id:"@garinz/dsh-sidebar-view",factory:require=>{var module={exports:{}};var exports=module.exports;
-;try{console.info('[dsh-sidebar-view] build 2026-11-18T09:03:38.138Z')}catch(e){}
+;try{console.info('[dsh-sidebar-view] build 2026-11-18T12:29:29.368Z')}catch(e){}
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
