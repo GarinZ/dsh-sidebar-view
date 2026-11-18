@@ -1,0 +1,85 @@
+{
+  "name": "@garinz/dsh-sidebar-view",
+  "version": "0.2.0",
+  "description": "Adds a time-grouped view and status tabs to the DeepSeek Harness sidebar by seating on the shipped workspace browser: the shipped package stays enabled, the plugin never registers services, and any failure falls back to the shipped UI.",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": false,
+      "inject": [
+        "@deepseek-ai/dsh-api-remote-access",
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-api-workspace-controller",
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-shortcuts",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-session",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-context-menu"
+      ]
+    }
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "cordis",
+    "sidebar",
+    "session",
+    "workspace"
+  ],
+  "author": "garin",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.15"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.1.0",
+    "@deepseek-ai/dsh-api-workspace-controller": "^0.2.2-rc.3",
+    "@deepseek-ai/dsh-client-store": "^0.2.2-rc.3",
+    "@deepseek-ai/dsh-client-ui-primitives": "^0.2.2-rc.3",
+    "@deepseek-ai/dsh-util-values": "^0.2.2-rc.3",
+    "@deepseek-ai/dsh-util-workspace-path": "^0.2.2-rc.3",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "clsx": "^2.1.1",
+    "esbuild": "^0.28.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GarinZ/dsh-sidebar-view.git"
+  },
+  "homepage": "https://github.com/GarinZ/dsh-sidebar-view#readme",
+  "bugs": {
+    "url": "https://github.com/GarinZ/dsh-sidebar-view/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

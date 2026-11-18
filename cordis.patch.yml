@@ -1,0 +1,12 @@
+# dsh-sidebar-view bundle layer.
+#
+# Only inserts this plugin's row. The shipped @deepseek-ai/dsh-client-ui-workspace
+# stays enabled: it keeps providing the `uiWorkspace` service and declares the
+# child slots (row leading/trailing/hover, row actions, directory flow). This
+# plugin seats on its live `sidebar.workspaces` entry at runtime and falls back to
+# the shipped component if anything goes wrong — a failed load can therefore
+# never take the rest of the client down.
+- insert:
+    - id: dsh-sidebar-view
+      name: '@garinz/dsh-sidebar-view'
+      config: {}
