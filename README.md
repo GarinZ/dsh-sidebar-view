@@ -68,7 +68,9 @@ dsh plugin --profile web remove dsh-sidebar-view
 | DeepSeek Harness `0.2.2-rc.3` · macOS Desktop（`desktop` profile） | 已验证 |
 | DeepSeek Harness `0.2.2-rc.3` · 浏览器 / `web` profile | 已验证 |
 | 隔离的干净 profile（只装本插件） | 已验证：启动无报错 |
-| DSH `0.3.x` | 未验证，需要按新版 `dsh-client-ui-workspace` 重新对齐移植层 |
+| DSH `0.3.x` | 未验证；`engines.dsh` 会在安装时直接拒绝，不会让你装上一个会崩的版本 |
+
+`package.json` 声明 `engines.dsh: >=0.2.2-0 <0.3.0`，宿主在安装、更新和启动时都会据此检查；需要提前试用时用 `dsh plugin --profile <p> allow-version` 显式豁免。
 
 ## 使用
 

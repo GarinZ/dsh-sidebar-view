@@ -65,7 +65,9 @@ The plugin never patches shipped files and never writes user data; remove it and
 | DeepSeek Harness `0.2.2-rc.3` · macOS desktop (`desktop` profile) | Verified |
 | DeepSeek Harness `0.2.2-rc.3` · browser / `web` profile | Verified |
 | Clean isolated profile with only this plugin | Verified: boots cleanly |
-| DSH `0.3.x` | Untested; the port needs realigning with the new `dsh-client-ui-workspace` |
+| DSH `0.3.x` | Untested; `engines.dsh` refuses the install, so you cannot land on a version that breaks |
+
+The manifest declares `engines.dsh: >=0.2.2-0 <0.3.0`; the host checks it on install, update, and boot. To try a newer host early, opt in explicitly with `dsh plugin --profile <p> allow-version`.
 
 ## Usage
 
