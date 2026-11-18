@@ -1,5 +1,5 @@
-window.__ModuleLoader__.load({id:"@garinz/dsh-sidebar-view",factory:require=>{var module={exports:{}};var exports=module.exports;
-;try{console.info('[dsh-sidebar-view] build 2026-11-18T12:29:29.368Z')}catch(e){}
+window.__ModuleLoader__.load({id:"dsh-sidebar-view",factory:require=>{var module={exports:{}};var exports=module.exports;
+;try{console.info('[dsh-sidebar-view] build 2026-11-18T12:34:38.217Z')}catch(e){}
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -4649,7 +4649,7 @@ function apply(ctx) {
 }
 
 ;(function () {
-  var id = "@garinz/dsh-sidebar-view"
+  var id = "dsh-sidebar-view"
   var existing = document.querySelector('style[data-plugin="' + id + '"]')
   if (existing) return
   var el = document.createElement('style')

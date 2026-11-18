@@ -1,93 +1,126 @@
-# @garinz/dsh-sidebar-view
+# dsh-sidebar-view
 
-给 DeepSeek Harness 左侧栏「会话 / 工作区」这一层加两个原生没有的能力：**按时间分组**与**状态 Tab**。
+简体中文 | [English](README.en.md)
 
-原生（0.2.2-rc.3）的「视图选项」只有 按工作区 / 按工作区树 / 单列表 三种分组、隐藏已归档的筛选。
-本插件在**保留原生全部行为**的前提下追加：
+[![npm](https://img.shields.io/npm/v/dsh-sidebar-view)](https://www.npmjs.com/package/dsh-sidebar-view)
+[![license](https://img.shields.io/npm/l/dsh-sidebar-view)](LICENSE)
+[![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.3-4f46e5)](https://github.com/deepseek-ai)
 
-1. **按时间**（第四种分组）：`置顶 → 今天 → 昨天 → 本周（周一起算）→ 更早`，空桶自动隐藏，
-   桶头带行数与折叠三角，行尾显示所属工作区名，跨项目可见。**桶内支持拖拽排序**：
-   拖动只落在同一桶内（跨桶不显示插入线、松手也不改序）；落点写回全局手动顺序，
-   因此单列表视图的排序会同步变化。首次拖动会自动把「排序方式」切到手动排序，
-   否则「最近更新」的实时排序会立刻覆盖掉刚拖出来的顺序。
-2. **状态 Tab**（标题下方一排）：`全部 / 运行中 / 待确认 / 待查看`，带实时计数，
-   在四种分组模式下一致生效；过滤后为空的组/桶自动消失。搜索展开时自动隐藏，避免与搜索结果计数混淆。
-3. **行尾工作区名 chip**：单列表与按时间模式下，平铺的行也能一眼看出属于哪个项目。
+**给 DeepSeek Harness 的会话列表加两件原生没有的事：按时间分组，按状态筛选。**
 
-其余（搜索、右键菜单、重命名、分叉、置顶、归档、手动排序、展开其余 N 个、
-添加工作区、工作区菜单、快捷键、收起 56px rail）全部沿用原生实现。
+同时开五六个会话、隔天再回来的时候，原生侧栏只按工作区堆着，你得自己一行行找回「昨天那个改 CI 的」。
+这个插件给侧栏加一种「按时间」的分组方式，以及一排带计数的状态 Tab——置顶、今天、昨天、本周、更早，
+一眼看到哪个在跑、哪个跑完了还没看。
 
-## 实现方式：坐在原生组件上，而不是接管它
+![按时间分组](https://raw.githubusercontent.com/GarinZ/dsh-sidebar-view/main/docs/screenshots/time-groups.png)
 
-- `@deepseek-ai/dsh-client-ui-workspace` **保持启用**。它继续提供 `uiWorkspace` 服务、
-  声明全部子槽位（行首/行尾/悬停 seat、行操作、目录选择器）、注册 locale 与快捷键。
-- 本插件在该插件注册的 `sidebar.workspaces` 条目上，把 `entry.component` 换成自己的外壳：
-  外壳合成原生 store 快照 + 两个增量字段，再把原生 props（含 `renderSlot`）传给移植版浏览器组件。
-  所以第三方行装饰、行按钮、目录选择器看到的仍是同一个 slot 所有者，无需任何改动。
-- **失败是本地化的**：组件抛错时错误边界渲染原生组件；bundle 没加载时原生组件根本没被动过；
-  插件不注册任何服务、不改任何 profile、不写用户数据。最坏情况是「没有新功能」，不是「整个客户端起不来」。
-- 增量状态单独存 `localStorage["dsh.workspace.view.sidebar-view.v1"]`（`timeMode / statusFilter / timeBucketExpansion`），
-  原生 key `dsh.workspace.view.v5` 仍由原生 store 独占，不混写。
-- `cordis.patch.yml` 只有一条 `insert`（包名必须带引号，`@` 是 YAML 保留指示符）。
+## 功能
 
-## 构建
+- **按时间分组**：视图选项里多出第四种分组「按时间」。范围是 `置顶 → 今天 → 昨天 → 本周（周一起算）→ 更早`，空桶自动隐藏；桶头带行数与折叠三角，可以整段收起。
+- **跨项目平铺**：时间视图不看工作区边界，所有项目的会话混在一条时间轴上，行尾标出所属工作区（`atlas-web`、`infra`……），不用点开就知道来自哪个项目。
+- **状态 Tab**：标题下面一排 `全部 / 运行中 / 待确认 / 待查看`，带实时计数。四种分组方式（按工作区 / 按工作区树 / 单列表 / 按时间）都生效，过滤后为空的组和桶自动消失。
+- **桶内拖拽**：时间视图里可以拖动排序，但只在同一个桶内生效——跨桶松手不会改序，因为桶本身由最后更新时间决定。落点写回全局手动顺序，单列表视图的顺序同步变化。
+- **原生行为一个不少**：搜索（本地 + 宿主）、右键菜单、重命名、分叉、置顶、归档、手动排序、展开其余 N 个、添加工作区、工作区菜单、快捷键、收起 56px rail，全部沿用原生实现，插件只加不减。
 
-```bash
-cd sidebar-view
-npm install          # 仅首次
-node build.mjs       # 产出 client.js（约 220 KB，内含 CSS）
-```
+![单列表 + 工作区名](https://raw.githubusercontent.com/GarinZ/dsh-sidebar-view/main/docs/screenshots/one-list.png)
 
-构建脚本先在内存里拼产物、用 `node:vm` 跑一遍冒烟测试（断言 `__ModuleLoader__.load` 注册了本包），
-再写临时文件并 `rename` 原子替换 `client.js` —— 避免宿主 watcher 读到写了一半的文件。
+## 它解决什么
+
+原生的「视图选项」已经有三件事：按工作区、按工作区树、单列表（平铺），以及隐藏已归档。
+缺的是时间维度和状态维度：
+
+| 想要 | 原生 0.2.2-rc.3 | 本插件 |
+| --- | --- | --- |
+| 跨项目平铺 | 单列表 | 保留，且行尾补上工作区名 |
+| 今天 / 昨天 / 本周分组 | 无 | 按时间（第四种分组） |
+| 全部 / 运行中 / 待确认 / 待查看 | 无（只有归档筛选） | 状态 Tab，带计数 |
+| 按工作区分组 | 有 | 保留 |
+| 置顶置前 | 有 | 保留，并在时间视图里单独成桶 |
+
+![视图选项](https://raw.githubusercontent.com/GarinZ/dsh-sidebar-view/main/docs/screenshots/view-options.png)
 
 ## 安装
 
 ```bash
+# 从 npm 安装（发布后）
+dsh plugin --profile web add dsh-sidebar-view
+
 # 从 GitHub 安装（仓库里带了构建好的 client.js，无需本地构建）
-dsh plugin --profile <profile> add git+https://github.com/GarinZ/dsh-sidebar-view.git
+dsh plugin --profile web add git+https://github.com/GarinZ/dsh-sidebar-view.git
+
 # 本地开发
-dsh plugin --profile <profile> add link:/Users/garin/Project/llm/dsh-plugins/sidebar-view
-# 或打包产物
-dsh plugin --profile <profile> add /path/to/garinz-dsh-sidebar-view-0.2.0.tgz
+dsh plugin --profile web add link:/path/to/dsh-sidebar-view
 ```
 
-命令会把依赖写进 profile 的 `package.json` 并自动追加 `dsh.profile.bundles`。装完重启应用生效。
-
-卸载 / 回滚：
+装完重启应用生效。卸载：
 
 ```bash
-dsh plugin --profile <profile> remove @garinz/dsh-sidebar-view
+dsh plugin --profile web remove dsh-sidebar-view
 ```
 
-原生侧栏随即恢复；本插件没有改动任何原生文件或用户数据。
+插件不改任何原生文件、不写用户数据；卸载后侧栏立刻回到原生样子。
 
-## 已验证（2026-11-18，DSH 0.2.2-rc.3）
+> 真实桌面应用用的是 `desktop` profile（由 Electron 管理，不能 `--dump-config`）。
+> 装进桌面版就把上面的 `web` 换成 `desktop`，装完退出应用再打开。
 
-在隔离的干净 profile（只装本插件）与真实桌面 profile 上验证：
+## 兼容性
 
-| 场景 | 结果 |
+| 环境 | 状态 |
 | --- | --- |
-| 只装本插件的新 profile | 侧栏正常、4 个状态 Tab、输入框正常、无 console 报错 |
-| 故意把 `client.js` 改成一加载就 throw | 只有 `web boot: warning: 1 entry did not activate`，原生侧栏与输入框照常，应用不退出 |
-| 让 `Seat` 渲染时 throw | 错误边界回退原生组件（日志一行），输入框与页面正常 |
-| 运行中重建 bundle（HMR） | 新产物的 build 戳打印，Tab/输入框都在，无异常 |
-| 真实桌面应用 | AX 树取证：`全部 31 / 运行中 1 / 待确认 0 / 待查看 0`；桶 `置顶 4 / 今天 5 / 昨天 6 / 更早 16`；行尾工作区 chip；`AXTextArea 发消息或创建任务…` 与「访问模式」「选择模型」均在 |
+| DeepSeek Harness `0.2.2-rc.3` · macOS Desktop（`desktop` profile） | 已验证 |
+| DeepSeek Harness `0.2.2-rc.3` · 浏览器 / `web` profile | 已验证 |
+| 隔离的干净 profile（只装本插件） | 已验证：启动无报错 |
+| DSH `0.3.x` | 未验证，需要按新版 `dsh-client-ui-workspace` 重新对齐移植层 |
+
+## 使用
+
+打开侧栏右上角的**视图选项**（滑杆图标）：
+
+- 「分组方式」里选 **按时间**；
+- 想看某一个状态，点标题下方的 **全部 / 运行中 / 待确认 / 待查看**；
+- 时间视图的桶头点一下可以收起整段；拖动行只在同一桶内换序。
+
+状态含义：
+
+- **运行中**：会话正在跑（含正在跑子智能体）；
+- **待确认**：有工具调用在等你的确认；
+- **待查看**：这一轮在后台跑完、你还没打开过（沿用原生 `completionUnread`，刷新页面会清空）。
+
+增量状态存在 `localStorage["dsh.workspace.view.sidebar-view.v1"]`，原生 key
+`dsh.workspace.view.v5` 由原生 store 独占。想彻底重置，把这两个 key 一起删掉即可。
+
+## 实现方式：坐在原生组件上，而不是接管它
+
+侧栏「会话 / 工作区」整块是同一个组件，注册在 `sidebar.workspaces` 这个 single 槽位上。
+本插件**不禁用** `@deepseek-ai/dsh-client-ui-workspace`，也不注册任何服务：
+
+1. 等它注册完，把该条目的 `component` 包进自己的错误边界；
+2. 外壳读原生 store 快照，叠加两个增量字段（`statusFilter`、时间桶折叠状态），
+   再把原生 props（含 `renderSlot`）传给移植过的浏览器组件；
+3. 组件抛错时，错误边界直接渲染原生组件；bundle 没加载时，原生组件根本没被动过。
+
+所以第三方往行首/行尾注入的装饰、行操作按钮、目录选择器都照常工作，
+最坏情况是「没有新功能」，而不是「客户端起不来」。
 
 ## 已知限制
 
-- 依赖 0.2.2-rc.3 的**未文档化内部契约**：`StoredEntry.component` 可替换、渲染器按 entry 读组件。
-  若上游改变这一实现，插件会「不生效」而不是崩溃（入口拿不到可替换的 entry 时插件不做任何事，客户端按无本插件启动）。
-- 时间视图的拖拽只在桶内生效：桶由更新时刻决定，跨桶没有可写的目标位置。
-- 行尾 chip 占约 72px，长标题截断更早。
-- 纯 web profile 下「添加工作区」浮层需要 `sidebar.workspaces.directoryFlow` 提供者
-  （`dsh-client-ui-directory-picker-browse`），桌面应用里正常。
-- DSH 升级到 0.3.x 后需要按新版 `dsh-client-ui-workspace` 重新对齐移植层。
+- 依赖 `0.2.2-rc.3` 的未文档化内部契约（`StoredEntry.component` 可替换）。上游一旦改动，插件会「不生效」而不是崩溃。
+- 时间视图的拖拽只作用于同一桶内：桶由更新时间决定，跨桶没有可写的目标位置。
+- 行尾工作区 chip 占约 72px，长标题会比原生更早截断。
+- 纯 `web` profile 下「添加工作区」的浮层需要 `dsh-client-ui-directory-picker-browse`，桌面应用里正常。
 
-## 与上游同步
+## 开发
 
-1. 从 `app.asar` 取出新版的 `@deepseek-ai/dsh-client-ui-workspace` 源码（`src/client`）；
-2. 覆盖 `src/browser/`；
-3. 把 `tree.ts`、`stores.ts`、`locales.ts`、`rows/Rows.tsx`、`rows/WorkspaceBrowser.tsx` 里的
-   时间分组 / 状态 Tab / workspaceLabel 增量贴回（改动点均有注释）；
-4. `node build.mjs` 后按上表回归。
+```bash
+npm install
+node build.mjs     # 产出 client.js（约 220 KB，内含 CSS）
+```
+
+构建先在内存里拼产物，用 `node:vm` 跑一遍冒烟测试（断言 `__ModuleLoader__.load` 注册了本包），
+再写临时文件并 `rename` 原子替换——避免宿主 watcher 读到写了一半的文件。
+
+移植层在 `src/browser/`（fork 自 `dsh-client-ui-workspace` 的 client 源码），
+增量改动的坐标写在 `src/browser/tree.ts`、`stores.ts`、`locales.ts`、`rows/Rows.tsx`、
+`rows/WorkspaceBrowser.tsx` 的注释里。DSH 升级后按新版源码重新覆盖 `src/browser/` 再贴回增量。
+
+MIT License

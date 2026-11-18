@@ -8,5 +8,5 @@
 # never take the rest of the client down.
 - insert:
     - id: dsh-sidebar-view
-      name: '@garinz/dsh-sidebar-view'
+      name: 'dsh-sidebar-view'
       config: {}
