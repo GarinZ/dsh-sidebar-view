@@ -1,0 +1,67 @@
+{
+  "format": 1,
+  "title": {
+    "en": "Sidebar View Index",
+    "zh": "Sidebar View 插件源"
+  },
+  "description": {
+    "en": "Index for dsh-sidebar-view: add this URL under Plugins → Discover → Manage index sources to install it there.",
+    "zh": "dsh-sidebar-view 的插件源：在插件 → 发现 → 管理索引源里添加本 URL 即可安装。"
+  },
+  "metadata": {
+    "categories": {
+      "ui": {
+        "title": {
+          "en": "UI Enhancements",
+          "zh": "UI 增强"
+        }
+      }
+    },
+    "labels": {},
+    "sortKeys": {}
+  },
+  "plugins": [
+    {
+      "name": "dsh-sidebar-view",
+      "title": {
+        "en": "Sidebar View",
+        "zh": "侧栏视图"
+      },
+      "description": {
+        "en": "Groups sessions into time buckets (pinned, today, yesterday, this week, earlier) and filters them with status tabs (all, running, awaiting, unread), with each row labelled by workspace. Seats on the shipped sidebar and falls back to it on failure.",
+        "zh": "把会话按时间分桶（置顶、今天、昨天、本周、更早），并用状态标签页筛选（全部、运行中、待确认、待查看），每行标出所属工作区。挂在原生侧栏上，出错自动回退。"
+      },
+      "author": "Garin",
+      "homepage": "https://github.com/GarinZ/dsh-sidebar-view#readme",
+      "repository": {
+        "url": "https://github.com/GarinZ/dsh-sidebar-view"
+      },
+      "metadata": {
+        "category": "ui",
+        "keywords": [
+          "sidebar",
+          "session",
+          "time grouping",
+          "status tabs",
+          "侧栏",
+          "会话",
+          "时间分组"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "1.0.0",
+          "publishTimestamp": 1795008537,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.3 <0.3.0-0"
+          }
+        }
+      ]
+    }
+  ]
+}
