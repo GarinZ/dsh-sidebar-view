@@ -44,8 +44,11 @@ node build.mjs       # 产出 client.js（约 220 KB，内含 CSS）
 ## 安装
 
 ```bash
+# 从 GitHub 安装（仓库里带了构建好的 client.js，无需本地构建）
+dsh plugin --profile <profile> add git+https://github.com/GarinZ/dsh-sidebar-view.git
+# 本地开发
 dsh plugin --profile <profile> add link:/Users/garin/Project/llm/dsh-plugins/sidebar-view
-# 或发布产物
+# 或打包产物
 dsh plugin --profile <profile> add /path/to/garinz-dsh-sidebar-view-0.2.0.tgz
 ```
 
