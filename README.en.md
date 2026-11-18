@@ -10,7 +10,9 @@
 
 When five or six sessions are open and you come back the next day, the shipped sidebar only stacks them by workspace, so you scroll until you recognize "the one that touched CI yesterday". This plugin adds a fourth grouping mode, by time, and a row of status tabs with live counts — pinned, today, yesterday, this week, earlier — so you can see what is running and what finished while you were away.
 
-![Grouped by time](https://raw.githubusercontent.com/GarinZ/dsh-sidebar-view/main/docs/screenshots/time-groups.png)
+![Three views: the view-options menu, grouping by time, and the one-list view](https://raw.githubusercontent.com/GarinZ/dsh-sidebar-view/main/docs/screenshots/overview.png)
+
+*① The new “By time” entry in View options　② Pinned → Today → Yesterday → This week, each header with a count and collapse　③ One list across projects, with the workspace name on every row*
 
 ## Features
 
@@ -19,8 +21,6 @@ When five or six sessions are open and you come back the next day, the shipped s
 - **Status tabs**: `All / Running / Awaiting / Unread` with live counts, sitting right under the section title. They apply to all four grouping modes (by workspace, workspace tree, one list, by time); groups and buckets that end up empty disappear.
 - **Drag inside a bucket**: reorder rows in the time view, but only within the same bucket — dropping across buckets does nothing, because the bucket itself is decided by the last update time. The result is written back to the global manual order, so the one-list view reorders too.
 - **Everything native still works**: search (local + host), context menus, rename, fork, pin, archive, manual sort, "show N more", add workspace, workspace menus, shortcuts, the collapsed 56 px rail — all delegated to the shipped implementation. The plugin only adds.
-
-![One list with workspace names](https://raw.githubusercontent.com/GarinZ/dsh-sidebar-view/main/docs/screenshots/one-list.png)
 
 ## What it solves
 
@@ -33,8 +33,6 @@ The shipped View options already covers by workspace, workspace tree, one list (
 | All / running / awaiting / unread | None (archive filter only) | Status tabs with counts |
 | Group by workspace | Yes | Kept |
 | Pinned first | Yes | Kept, and its own bucket in the time view |
-
-![View options](https://raw.githubusercontent.com/GarinZ/dsh-sidebar-view/main/docs/screenshots/view-options.png)
 
 ## Install
 

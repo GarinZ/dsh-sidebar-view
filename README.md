@@ -12,7 +12,9 @@
 这个插件给侧栏加一种「按时间」的分组方式，以及一排带计数的状态 Tab——置顶、今天、昨天、本周、更早，
 一眼看到哪个在跑、哪个跑完了还没看。
 
-![按时间分组](https://raw.githubusercontent.com/GarinZ/dsh-sidebar-view/main/docs/screenshots/time-groups.png)
+![三个视图：视图选项菜单、按时间分组、单列表](https://raw.githubusercontent.com/GarinZ/dsh-sidebar-view/main/docs/screenshots/overview.png)
+
+*① 视图选项里多出的「按时间」　② 置顶 → 今天 → 昨天 → 本周，桶头带行数与折叠　③ 单列表跨项目平铺，行尾标出工作区*
 
 ## 功能
 
@@ -21,8 +23,6 @@
 - **状态 Tab**：标题下面一排 `全部 / 运行中 / 待确认 / 待查看`，带实时计数。四种分组方式（按工作区 / 按工作区树 / 单列表 / 按时间）都生效，过滤后为空的组和桶自动消失。
 - **桶内拖拽**：时间视图里可以拖动排序，但只在同一个桶内生效——跨桶松手不会改序，因为桶本身由最后更新时间决定。落点写回全局手动顺序，单列表视图的顺序同步变化。
 - **原生行为一个不少**：搜索（本地 + 宿主）、右键菜单、重命名、分叉、置顶、归档、手动排序、展开其余 N 个、添加工作区、工作区菜单、快捷键、收起 56px rail，全部沿用原生实现，插件只加不减。
-
-![单列表 + 工作区名](https://raw.githubusercontent.com/GarinZ/dsh-sidebar-view/main/docs/screenshots/one-list.png)
 
 ## 它解决什么
 
@@ -36,8 +36,6 @@
 | 全部 / 运行中 / 待确认 / 待查看 | 无（只有归档筛选） | 状态 Tab，带计数 |
 | 按工作区分组 | 有 | 保留 |
 | 置顶置前 | 有 | 保留，并在时间视图里单独成桶 |
-
-![视图选项](https://raw.githubusercontent.com/GarinZ/dsh-sidebar-view/main/docs/screenshots/view-options.png)
 
 ## 安装
 
