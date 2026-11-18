@@ -37,7 +37,7 @@ The shipped View options already covers by workspace, workspace tree, one list (
 ## Install
 
 ```bash
-# From npm (once published)
+# From npm
 dsh plugin --profile web add dsh-sidebar-view
 
 # From GitHub (the repo ships the built client.js, no local build needed)

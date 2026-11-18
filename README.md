@@ -40,7 +40,7 @@
 ## 安装
 
 ```bash
-# 从 npm 安装（发布后）
+# 从 npm 安装
 dsh plugin --profile web add dsh-sidebar-view
 
 # 从 GitHub 安装（仓库里带了构建好的 client.js，无需本地构建）
