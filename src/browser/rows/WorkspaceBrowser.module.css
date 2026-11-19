@@ -61,6 +61,18 @@
   min-width: 200px;
 }
 
+/* Stepped "A" used as the icon of each type-size row: same 16px column as a
+   real icon, so the three options line up with every other menu item. */
+.typeScaleGlyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-weight: 600;
+  line-height: 1;
+}
+
 /* Section header: title, an inline search control, and the two trailing
    actions. Expanding search collapses the action cluster and takes its room. */
 .sectionHeader {

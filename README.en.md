@@ -16,13 +16,14 @@ When five or six sessions are open and you come back the next day, the shipped s
 
 ![Three views: the view-options menu, grouping by time, and the one-list view](https://raw.githubusercontent.com/GarinZ/dsh-sidebar-view/main/docs/screenshots/overview.png)
 
-*① The new “By time” entry in View options　② Pinned → Today → Yesterday → This week, each header with a count and collapse　③ One list across projects, with the workspace name on every row*
+*① The new “By time” entry in View options　② Pinned → Today → Yesterday → This week, each header with a count and collapse　③ One list across projects, optionally labelled with the workspace name*
 
 ## Features
 
 - **Group by time**: a fourth entry in View options. Buckets are `Pinned → Today → Yesterday → This week (from Monday) → Earlier`; empty buckets disappear, and each header shows its count and collapses on click.
-- **Flat across projects**: the time view ignores workspace boundaries, so sessions from every project share one timeline. Each row ends with its workspace name (`atlas-web`, `infra`, …) so you know where it came from without opening it.
+- **Flat across projects**: the time view ignores workspace boundaries, so sessions from every project share one timeline. Each row can end with its workspace name (`atlas-web`, `infra`, …) so you know where it came from without opening it.
 - **Status tabs**: `All / Running / Awaiting / Unread` with live counts, sitting right under the section title. They apply to all four grouping modes (by workspace, workspace tree, one list, by time); groups and buckets that end up empty disappear.
+- **Type scale and workspace names**: three sizes in View options (`Small / Default / Large`). They change the glyphs of titles and counts only — the row stays 28 px, so the density does not follow the font. A "Show workspace names" toggle labels rows in the one-list and by-time views; the by-workspace views skip it because their headers already are the workspace.
 - **Drag inside a bucket**: reorder rows in the time view, but only within the same bucket — dropping across buckets does nothing, because the bucket itself is decided by the last update time. The result is written back to the global manual order, so the one-list view reorders too.
 - **Everything native still works**: search (local + host), context menus, rename, fork, pin, archive, manual sort, "show N more", add workspace, workspace menus, shortcuts, the collapsed 56 px rail — all delegated to the shipped implementation. The plugin only adds.
 
@@ -32,7 +33,7 @@ The shipped View options already covers by workspace, workspace tree, one list (
 
 | Want | Shipped 0.2.2-rc.3 | This plugin |
 | --- | --- | --- |
-| Flat across projects | One list | Kept, plus a workspace name per row |
+| Flat across projects | One list | Kept, plus an optional workspace name per row |
 | Today / yesterday / this week | None | By time (fourth grouping mode) |
 | All / running / awaiting / unread | None (archive filter only) | Status tabs with counts |
 | Group by workspace | Yes | Kept |

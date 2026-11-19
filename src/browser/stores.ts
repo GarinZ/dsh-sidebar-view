@@ -23,6 +23,25 @@ export const FLAT_SESSION_ORDER_KEY = '__flat_session_order__'
 export type SessionGroupBy = 'workspace' | 'workspace-tree' | 'flat' | 'time'
 /** Session order: saved manual positions or current recency. */
 export type SessionOrderBy = 'manual' | 'updated'
+/** Title/timestamp type scale: one step either side of today's 13px title. */
+export type TextScale = 'small' | 'normal' | 'large'
+
+/**
+ * Type sizes per scale, as the custom properties the row styles read. The row
+ * box itself stays 28px: shrinking the glyphs buys reading comfort and a
+ * shorter line, not more rows, and a fixed row keeps the hover/insert targets
+ * where the drag code expects them.
+ */
+export const TEXT_SCALE_CSS: Readonly<Record<TextScale, { title: string; line: string; meta: string; time: string }>> = {
+  small: { title: '12px', line: '17px', meta: '10px', time: '10px' },
+  normal: { title: '13px', line: '18px', meta: '11px', time: '10px' },
+  large: { title: '14px', line: '20px', meta: '12px', time: '11px' },
+}
+
+/** Whether a persisted value is one of the scale presets. */
+export function isTextScale(value: unknown): value is TextScale {
+  return value === 'small' || value === 'normal' || value === 'large'
+}
 
 /** Workspace browser viewing state persisted across surface remounts and reloads. */
 type WorkspaceViewState = {
@@ -38,6 +57,10 @@ type WorkspaceViewState = {
   statusFilter?: SessionStatusFilter
   /** Time buckets the user folded; absent keys stay open. */
   timeBucketExpansion: Record<string, boolean>
+  /** Title/timestamp scale; omitted in older snapshots and read as 'normal'. */
+  textScale?: TextScale
+  /** Row-end Workspace name in the flattened views; omitted reads as off. */
+  showWorkspaceName?: boolean
 }
 
 type SessionOrderSource = {

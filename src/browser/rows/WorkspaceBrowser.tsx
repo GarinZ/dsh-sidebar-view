@@ -21,8 +21,8 @@ import clsx from 'clsx'
 import { WorkspaceDialogs } from './WorkspaceDialogs.tsx'
 import {
   AnimatedRows, HoverCardGroup, IconArchiveCheckOutlineRegular, IconArchiveOffOutlineRegular, IconArchiveOutlineRegular,
-  IconChevronsUpDownOutlineRegular, IconClockOutlineRegular, IconCloseFillRegular,
-  IconFlatListOutlineRegular, IconFolderCloseRegular, IconProjectAddOutlineRegular,
+  IconChevronsUpDownOutlineRegular, IconClockOutlineRegular, IconCloseFillRegular, IconEyeOffOutlineRegular,
+  IconEyeOutlineRegular, IconFlatListOutlineRegular, IconFolderCloseRegular, IconProjectAddOutlineRegular,
   IconQueueOutlineRegular, IconSearchOutlineRegular, IconSlidersTwoOutlineRegular,
   IconWorkspaceTreeOutlineRegular, Menu, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -44,7 +44,7 @@ import {
   TIME_BUCKET_ORDER, UNGROUPED_KEY,
 } from '../tree.ts'
 import { ProjectRowItem, SearchResultItem, SessionNodeItem, TimeBucketRowItem } from './Rows.tsx'
-import { FLAT_SESSION_ORDER_KEY, type SessionGroupBy } from '../stores.ts'
+import { FLAT_SESSION_ORDER_KEY, TEXT_SCALE_CSS, type SessionGroupBy, type TextScale } from '../stores.ts'
 import { WorkspacePickFlow } from '../WorkspacePicker.tsx'
 import css from './WorkspaceBrowser.module.css'
 
@@ -144,14 +144,21 @@ function useNativeDragAcceptance(active: boolean): void {
   }, [active])
 }
 
-/** Grouping, ordering, and archived-filter menu; own open state so it resets with the wide chrome. */
-function ViewOptionsMenu({ groupBy, orderBy, archivedFilter, onGroupPick, onOrderPick, onArchivedFilterPick, t }: {
+/** Grouping, ordering, type scale, and archived-filter menu; own open state so it resets with the wide chrome. */
+function ViewOptionsMenu({
+  groupBy, orderBy, archivedFilter, textScale, showWorkspaceName,
+  onGroupPick, onOrderPick, onArchivedFilterPick, onTextScalePick, onShowWorkspaceNameToggle, t,
+}: {
   groupBy: SessionGroupBy
   orderBy: SessionOrderBy
   archivedFilter: ArchivedFilter
+  textScale: TextScale
+  showWorkspaceName: boolean
   onGroupPick: (mode: SessionGroupBy) => void
   onOrderPick: (mode: SessionOrderBy) => void
   onArchivedFilterPick: (filter: ArchivedFilter) => void
+  onTextScalePick: (scale: TextScale) => void
+  onShowWorkspaceNameToggle: (show: boolean) => void
   t: WorkspaceBrowserProps['t']
 }) {
   const [open, setOpen] = useState(false)
@@ -169,6 +176,19 @@ function ViewOptionsMenu({ groupBy, orderBy, archivedFilter, onGroupPick, onOrde
         { type: 'label' as const, id: 'order-by', text: t('orderBy.label') },
         { id: 'manual', label: t('orderBy.manual'), icon: <IconChevronsUpDownOutlineRegular /> },
         { id: 'updated', label: t('orderBy.updated'), icon: <IconClockOutlineRegular /> },
+        { type: 'separator' as const, id: 'text-size-separator' },
+        { type: 'label' as const, id: 'text-size', text: t('textSize.label') },
+        // The stepped A is the one glyph that reads as "type size"; it also
+        // keeps these rows aligned with the icon column above and below.
+        { id: 'text-small', label: t('textSize.small'), icon: <span aria-hidden className={css.typeScaleGlyph} style={{ fontSize: 10 }}>A</span> },
+        { id: 'text-normal', label: t('textSize.normal'), icon: <span aria-hidden className={css.typeScaleGlyph} style={{ fontSize: 13 }}>A</span> },
+        { id: 'text-large', label: t('textSize.large'), icon: <span aria-hidden className={css.typeScaleGlyph} style={{ fontSize: 16 }}>A</span> },
+        { type: 'separator' as const, id: 'row-detail-separator' },
+        {
+          id: 'show-workspace-name',
+          label: t('viewOptions.showWorkspaceName'),
+          icon: showWorkspaceName ? <IconEyeOutlineRegular /> : <IconEyeOffOutlineRegular />,
+        },
         { type: 'separator' as const, id: 'archived-filter-separator' },
         { type: 'label' as const, id: 'filter-by', text: t('filterBy.label') },
         { id: 'hide-archived', label: t('viewOptions.hideArchived'), icon: <IconArchiveOffOutlineRegular /> },
@@ -178,11 +198,17 @@ function ViewOptionsMenu({ groupBy, orderBy, archivedFilter, onGroupPick, onOrde
       selectedIds={[
         groupBy,
         orderBy,
+        { small: 'text-small', normal: 'text-normal', large: 'text-large' }[textScale],
+        ...(showWorkspaceName ? ['show-workspace-name'] : []),
         { default: 'hide-archived', show: 'show-archived', only: 'only-archived' }[archivedFilter],
       ]}
       onSelect={(id) => {
         if (id === 'workspace' || id === 'workspace-tree' || id === 'flat' || id === 'time') onGroupPick(id)
         else if (id === 'manual' || id === 'updated') onOrderPick(id)
+        else if (id === 'text-small') onTextScalePick('small')
+        else if (id === 'text-normal') onTextScalePick('normal')
+        else if (id === 'text-large') onTextScalePick('large')
+        else if (id === 'show-workspace-name') onShowWorkspaceNameToggle(!showWorkspaceName)
         else if (id === 'hide-archived') onArchivedFilterPick('default')
         else if (id === 'show-archived') onArchivedFilterPick('show')
         else if (id === 'only-archived') onArchivedFilterPick('only')
@@ -691,7 +717,7 @@ function SessionTree({
 /** The flat "In one list" body: every session is one draggable top-level row. */
 function FlatList({
   list, sessionIds, rowState, onLeaveArchivedOnly, useSessionStatus, useSessionAccess, open, onSessionRenameRequest,
-  usePanelInfo, setSessionOrder, workspaceReady, animationResetKey, statusFilter,
+  usePanelInfo, setSessionOrder, workspaceReady, animationResetKey, statusFilter, workspaceLabelOf,
   revealSessionId, onSessionRevealed, renderSlot, renderFactorySlot, useContextMenuTarget, useContextMenu, home, t,
 }: Pick<
   SessionTreeProps,
@@ -715,6 +741,8 @@ function FlatList({
 > & {
   list: SessionListState
   sessionIds: readonly SessionId[]
+  /** Workspace name per Session; absent while the option is off. */
+  workspaceLabelOf?: ((id: SessionId) => string | undefined) | undefined
 }) {
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
   const statuses = useSessionStatus(s => s)
@@ -762,8 +790,10 @@ function FlatList({
               onOpen={open}
               onRenameRequest={onSessionRenameRequest}
               renderSlot={renderSlot}
-              renderFactorySlot={renderFactorySlot} useContextMenu={useContextMenu}
+              renderFactorySlot={renderFactorySlot}
+              useContextMenu={useContextMenu}
               useContextMenuTarget={useContextMenuTarget}
+              workspaceLabel={workspaceLabelOf?.(node.id)}
               onReveal={node.id === revealSessionId
                 ? () => { onSessionRevealed(node.id) }
                 : undefined}
@@ -806,7 +836,7 @@ function FlatList({
  * card. Buckets fold from their own header.
  */
 function TimeGroups({
-  list, sessionIds, rowState, statusFilter, bucketExpansion, onToggleBucket,
+  list, sessionIds, rowState, statusFilter, bucketExpansion, onToggleBucket, workspaceLabelOf,
   onLeaveArchivedOnly, useSessionStatus, useSessionAccess, open, onSessionRenameRequest,
   usePanelInfo, workspaceReady, animationResetKey, revealSessionId, onSessionRevealed,
   renderSlot, renderFactorySlot, useContextMenuTarget, useContextMenu, home, t, setSessionOrder,
@@ -830,6 +860,8 @@ function TimeGroups({
 > & {
   list: SessionListState
   sessionIds: readonly SessionId[]
+  /** Workspace name per Session; absent while the option is off. */
+  workspaceLabelOf?: ((id: SessionId) => string | undefined) | undefined
   rowState: SessionRowState
   statusFilter: SessionStatusFilter
   /** Folded buckets by key; an absent key stays open. */
@@ -918,6 +950,7 @@ function TimeGroups({
                   renderFactorySlot={renderFactorySlot}
                   useContextMenu={useContextMenu}
                   useContextMenuTarget={useContextMenuTarget}
+                  workspaceLabel={workspaceLabelOf?.(node.id)}
                   onReveal={node.id === revealSessionId ? () => { onSessionRevealed(node.id) } : undefined}
                   useSessionAccess={useSessionAccess}
                   drag={{
@@ -1165,6 +1198,8 @@ export function WorkspaceBrowser({
   const archivedFilter = useStore(s => s.archivedFilter ?? 'default')
   const statusFilter = useStore(s => s.statusFilter ?? 'all')
   const timeBucketExpansion = useStore(s => s.timeBucketExpansion ?? {})
+  const textScale = useStore(s => s.textScale ?? 'normal')
+  const showWorkspaceName = useStore(s => s.showWorkspaceName === true)
   const groupExpansion = useStore(s => s.groupExpansion)
   const sessionOrderByAccount = useStore(s => s.sessionOrderByAccount)
   // Archived sessions are not openable: the row stays visible under the
@@ -1239,6 +1274,26 @@ export function WorkspaceBrowser({
       unread: rows.filter(row => matchesStatusFilter(row, 'unread')).length,
     }
   }, [list, orderedFlatSessionIds, rowState, sessionStatuses])
+  // Workspace names for the flattened views' row context, built only while the
+  // option is on: the map is one entry per Session and the default view pays
+  // nothing for it.
+  const workspaceLabelOf = useMemo(() => {
+    if (!showWorkspaceName) return undefined
+    const labels = new Map<SessionId, string>()
+    for (const workspace of workspaces) {
+      for (const id of workspace.sessionIds) labels.set(id, workspace.title)
+    }
+    return (id: SessionId): string | undefined => labels.get(id)
+  }, [workspaces, showWorkspaceName])
+  const typeScaleStyle = useMemo<CSSProperties>(() => {
+    const preset = TEXT_SCALE_CSS[textScale]
+    return {
+      '--dsh-sidebar-title-size': preset.title,
+      '--dsh-sidebar-title-line': preset.line,
+      '--dsh-sidebar-meta-size': preset.meta,
+      '--dsh-sidebar-time-size': preset.time,
+    } as CSSProperties
+  }, [textScale])
   const activeSessionOrders = useMemo<Readonly<Record<string, readonly SessionId[]>>>(() => Object.fromEntries([
     ...orderedWorkspaces.map(workspace => [workspace.workspaceId, workspace.sessionIds] as const),
     [UNGROUPED_KEY, orderedUngroupedSessionIds] as const,
@@ -1439,7 +1494,7 @@ export function WorkspaceBrowser({
     })
   }
   return (
-    <div className={clsx(css.root, !wide && css.rail)}>
+    <div className={clsx(css.root, !wide && css.rail)} style={typeScaleStyle}>
       <div className={clsx(css.sectionHeader, wide && searchSpacingMotionEnabled && css.searchSpacingMotion)} data-sidebar-workspace-header="">
         {wide && (
           <span className={clsx(css.sectionLabel, css.wide, searchExpanded && css.sectionLabelHidden)}>
@@ -1509,9 +1564,13 @@ export function WorkspaceBrowser({
               groupBy={groupBy}
               orderBy={orderBy}
               archivedFilter={archivedFilter}
+              textScale={textScale}
+              showWorkspaceName={showWorkspaceName}
               onGroupPick={actions.setGroupBy}
               onOrderPick={(mode) => { actions.setOrderBy(mode, activeSessionOrders) }}
               onArchivedFilterPick={actions.setArchivedFilter}
+              onTextScalePick={actions.setTextScale}
+              onShowWorkspaceNameToggle={actions.setShowWorkspaceName}
               t={t}
             />
           )}
@@ -1608,6 +1667,7 @@ export function WorkspaceBrowser({
                 sessionIds={orderedFlatSessionIds}
                 rowState={rowState}
                 statusFilter={statusFilter}
+                workspaceLabelOf={workspaceLabelOf}
                 bucketExpansion={timeBucketExpansion}
                 onToggleBucket={actions.setTimeBucketExpanded}
                 onLeaveArchivedOnly={leaveArchivedOnly}
@@ -1635,6 +1695,7 @@ export function WorkspaceBrowser({
                   sessionIds={orderedFlatSessionIds}
                   rowState={rowState}
                   statusFilter={statusFilter}
+                  workspaceLabelOf={workspaceLabelOf}
                   onLeaveArchivedOnly={leaveArchivedOnly}
                   workspaceReady={workspaceReady}
                   animationResetKey={`${groupBy}/${orderBy}/${archivedFilter}/${statusFilter}`}

@@ -178,19 +178,21 @@
   gap: 2px;
 }
 
+/* Type scale is a view option: the browser root sets these variables and the
+   row box stays 28px, so only the glyphs change. */
 .title {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--dsh-sidebar-title-size, 13px);
+  line-height: var(--dsh-sidebar-title-line, 18px);
 }
 
 .renameInput {
   min-width: 0;
-  font-size: 13px;
-  line-height: 18px;
+  font-size: var(--dsh-sidebar-title-size, 13px);
+  line-height: var(--dsh-sidebar-title-line, 18px);
   padding: 0 2px;
   border: 0.5px solid var(--dsw-alias-border-l4);
   border-radius: var(--dsw-radius-sm);
@@ -230,14 +232,28 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: var(--dsh-sidebar-meta-size, 11px);
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* Cross-project context for the flattened views only; see SessionNodeItem's
+   workspaceLabel. Never wider than 72px so a long path-derived name cannot
+   starve the title it sits beside. */
+.workspaceChip {
+  flex: none;
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--dsh-sidebar-time-size, 10px);
   line-height: 16px;
   color: var(--dsw-alias-label-tertiary);
 }
 
 .time {
   flex: none;
-  font-size: 10px;
+  font-size: var(--dsh-sidebar-time-size, 10px);
   line-height: 16px;
   color: var(--dsw-alias-label-tertiary);
   margin-inline-end: -1px;

@@ -632,7 +632,7 @@ export function SearchResultItem({
  */
 export function SessionNodeItem({
   node, currentId, now, onOpen, onRenameRequest, renderSlot, renderFactorySlot, useContextMenuTarget,
-  useContextMenu, onReveal, drag, home, useSessionAccess, t,
+  useContextMenu, onReveal, drag, home, useSessionAccess, t, workspaceLabel,
 }: {
   useContextMenu: WorkspaceBrowserProps['useContextMenu']
   renderFactorySlot: WorkspaceBrowserProps['renderFactorySlot']
@@ -649,6 +649,12 @@ export function SessionNodeItem({
   drag?: RowDragProps | undefined
   /** Host account home; POSIX home-rooted hover paths display as `~`. */
   home?: string | undefined
+  /**
+   * Workspace this Session belongs to, shown at the row end only by the
+   * flattened views (where nothing else says which project a row is in).
+   * Omitted when the view option is off, which is the default.
+   */
+  workspaceLabel?: string | undefined
   t: RowTranslate
 } & Pick<WorkspaceBrowserProps, 'useSessionAccess'> & PropsRenderSlots<
   | 'sidebar.workspaces.session.row.action'
@@ -771,6 +777,9 @@ export function SessionNodeItem({
           actions for existing content are available. */}
       {!row.blank && (
         <span className={css.rowResting}>
+          {workspaceLabel !== undefined && (
+            <span className={css.workspaceChip} title={workspaceLabel}>{workspaceLabel}</span>
+          )}
           <span
             className={clsx(css.time, primaryStatus.trailingLabel === undefined && css.timestamp)}
             aria-hidden={primaryStatus.trailingLabel === undefined ? undefined : true}

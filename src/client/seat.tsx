@@ -19,6 +19,7 @@
 import * as React from 'react'
 import { WorkspaceBrowser } from '../browser/rows/WorkspaceBrowser.tsx'
 import { de, en, es, fr, ja, pt, ru, zh } from '../browser/locales.ts'
+import { isTextScale, type TextScale } from '../browser/stores.ts'
 
 export const name = 'dsh-sidebar-view'
 /**
@@ -49,10 +50,18 @@ type AnyCtx = { get(name: string): unknown; effect(fn: () => () => void, label: 
  * so every write the shipped service makes stays visible to our UI.
  * ------------------------------------------------------------------ */
 
-type Plus = { timeMode: boolean; statusFilter: string; timeBucketExpansion: Record<string, boolean> }
+type Plus = {
+  timeMode: boolean
+  statusFilter: string
+  timeBucketExpansion: Record<string, boolean>
+  textScale: TextScale
+  showWorkspaceName: boolean
+}
 
 const PLUS_KEY = 'dsh.workspace.view.sidebar-view.v1'
-const PLUS_INIT: Plus = { timeMode: false, statusFilter: 'all', timeBucketExpansion: {} }
+const PLUS_INIT: Plus = {
+  timeMode: false, statusFilter: 'all', timeBucketExpansion: {}, textScale: 'normal', showWorkspaceName: false,
+}
 
 function readPlus(): Plus {
   try {
@@ -65,6 +74,8 @@ function readPlus(): Plus {
       timeBucketExpansion: typeof parsed.timeBucketExpansion === 'object' && parsed.timeBucketExpansion !== null
         ? parsed.timeBucketExpansion
         : {},
+      textScale: isTextScale(parsed.textScale) ? parsed.textScale : PLUS_INIT.textScale,
+      showWorkspaceName: parsed.showWorkspaceName === true,
     }
   } catch {
     return PLUS_INIT
@@ -94,6 +105,7 @@ const PICKED = [
   'groupBy.time',
   'timeBucket.pinned', 'timeBucket.today', 'timeBucket.yesterday', 'timeBucket.week', 'timeBucket.earlier',
   'statusTabs.label', 'statusTab.all', 'statusTab.running', 'statusTab.pending', 'statusTab.unread',
+  'textSize.label', 'textSize.small', 'textSize.normal', 'textSize.large', 'viewOptions.showWorkspaceName',
   'empty.noMatches',
 ]
 
@@ -197,6 +209,8 @@ function Seat(props: AnyProps & { Shipped: React.ComponentType<AnyProps> }): Rea
     groupBy: plus.timeMode ? 'time' : shippedState['groupBy'],
     statusFilter: plus.statusFilter,
     timeBucketExpansion: plus.timeBucketExpansion,
+    textScale: plus.textScale,
+    showWorkspaceName: plus.showWorkspaceName,
   }), [shippedState, plus])
   const snapRef = React.useRef(snapshot)
   snapRef.current = snapshot
@@ -218,6 +232,8 @@ function Seat(props: AnyProps & { Shipped: React.ComponentType<AnyProps> }): Rea
     setTimeBucketExpanded: (key: string, expanded: boolean): void => {
       setPlus({ timeBucketExpansion: { ...plusState.timeBucketExpansion, [key]: expanded } })
     },
+    setTextScale: (scale: TextScale): void => setPlus({ textScale: scale }),
+    setShowWorkspaceName: (show: boolean): void => setPlus({ showWorkspaceName: show }),
   }), [shippedActions])
   const t = useCompositeT(rest.t)
   return React.createElement(WorkspaceBrowser as unknown as React.ComponentType<Record<string, unknown>>, {
