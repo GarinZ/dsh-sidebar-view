@@ -185,14 +185,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--dsh-sidebar-title-size, 13px);
-  line-height: var(--dsh-sidebar-title-line, 18px);
+  font-size: var(--dsh-sidebar-title-size, 14px);
+  line-height: var(--dsh-sidebar-title-line, 20px);
 }
 
 .renameInput {
   min-width: 0;
-  font-size: var(--dsh-sidebar-title-size, 13px);
-  line-height: var(--dsh-sidebar-title-line, 18px);
+  font-size: var(--dsh-sidebar-title-size, 14px);
+  line-height: var(--dsh-sidebar-title-line, 20px);
   padding: 0 2px;
   border: 0.5px solid var(--dsw-alias-border-l4);
   border-radius: var(--dsw-radius-sm);
@@ -232,7 +232,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--dsh-sidebar-meta-size, 11px);
+  font-size: var(--dsh-sidebar-meta-size, 12px);
   line-height: 16px;
   color: var(--dsw-alias-label-tertiary);
 }

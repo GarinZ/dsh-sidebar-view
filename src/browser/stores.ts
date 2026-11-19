@@ -23,7 +23,12 @@ export const FLAT_SESSION_ORDER_KEY = '__flat_session_order__'
 export type SessionGroupBy = 'workspace' | 'workspace-tree' | 'flat' | 'time'
 /** Session order: saved manual positions or current recency. */
 export type SessionOrderBy = 'manual' | 'updated'
-/** Title/timestamp type scale: one step either side of today's 13px title. */
+/**
+ * Title/timestamp type scale. 'normal' is exactly what the shipped browser
+ * uses (14px/20px titles, 12px counts, 10px timestamps), so the default reads
+ * like the native sidebar; 'small' and 'large' move two pixels either side so
+ * the three presets are told apart at a glance rather than by 1px steps.
+ */
 export type TextScale = 'small' | 'normal' | 'large'
 
 /**
@@ -34,8 +39,8 @@ export type TextScale = 'small' | 'normal' | 'large'
  */
 export const TEXT_SCALE_CSS: Readonly<Record<TextScale, { title: string; line: string; meta: string; time: string }>> = {
   small: { title: '12px', line: '17px', meta: '10px', time: '10px' },
-  normal: { title: '13px', line: '18px', meta: '11px', time: '10px' },
-  large: { title: '14px', line: '20px', meta: '12px', time: '11px' },
+  normal: { title: '14px', line: '20px', meta: '12px', time: '10px' },
+  large: { title: '16px', line: '22px', meta: '13px', time: '11px' },
 }
 
 /** Whether a persisted value is one of the scale presets. */
