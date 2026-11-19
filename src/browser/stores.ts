@@ -24,23 +24,36 @@ export type SessionGroupBy = 'workspace' | 'workspace-tree' | 'flat' | 'time'
 /** Session order: saved manual positions or current recency. */
 export type SessionOrderBy = 'manual' | 'updated'
 /**
- * Title/timestamp type scale. 'normal' is exactly what the shipped browser
- * uses (14px/20px titles, 12px counts, 10px timestamps), so the default reads
- * like the native sidebar; 'small' and 'large' move two pixels either side so
- * the three presets are told apart at a glance rather than by 1px steps.
+ * Title/timestamp type scale. 'normal' keeps the shipped type metrics
+ * (14px/20px titles, 12px counts, 10px timestamps) in the 28px row this plugin
+ * has always used, so the default reads like the native sidebar; 'small' and
+ * 'large' move two pixels either side so the three presets are told apart at a
+ * glance rather than by 1px steps.
  */
 export type TextScale = 'small' | 'normal' | 'large'
 
 /**
- * Type sizes per scale, as the custom properties the row styles read. The row
- * box itself stays 28px: shrinking the glyphs buys reading comfort and a
- * shorter line, not more rows, and a fixed row keeps the hover/insert targets
- * where the drag code expects them.
+ * One row rhythm per scale, as the custom properties the row and list styles
+ * read. A scale is a density, not just a glyph size: the point of picking the
+ * small one is to read more rows in the same viewport, so the row box and the
+ * gaps between rows shrink with the type. Sizes keep the shipped ratios (a
+ * 14px title over a 10px timestamp) so every preset still looks like one
+ * family, and the preset carries the row box and the list gaps as well, which
+ * keeps every row type — Workspace, Session, bucket header, "show more" — on
+ * the same rhythm.
  */
-export const TEXT_SCALE_CSS: Readonly<Record<TextScale, { title: string; line: string; meta: string; time: string }>> = {
-  small: { title: '12px', line: '17px', meta: '10px', time: '10px' },
-  normal: { title: '14px', line: '20px', meta: '12px', time: '10px' },
-  large: { title: '16px', line: '22px', meta: '13px', time: '11px' },
+export const TEXT_SCALE_CSS: Readonly<Record<TextScale, {
+  title: string
+  line: string
+  meta: string
+  time: string
+  row: string
+  rowGap: string
+  groupGap: string
+}>> = {
+  small: { title: '12px', line: '16px', meta: '10px', time: '9px', row: '24px', rowGap: '1px', groupGap: '3px' },
+  normal: { title: '14px', line: '20px', meta: '12px', time: '10px', row: '28px', rowGap: '2px', groupGap: '4px' },
+  large: { title: '16px', line: '22px', meta: '13px', time: '11px', row: '32px', rowGap: '3px', groupGap: '6px' },
 }
 
 /** Whether a persisted value is one of the scale presets. */

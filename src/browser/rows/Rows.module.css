@@ -70,8 +70,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 14px;
-  line-height: 20px;
+  font-size: var(--dsh-sidebar-title-size, 14px);
+  line-height: var(--dsh-sidebar-title-line, 20px);
 }
 
 .searchResultMeta {
@@ -87,7 +87,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: var(--dsh-sidebar-meta-size, 12px);
   line-height: 17px;
 }
 
@@ -108,9 +108,10 @@
   color: var(--dsw-alias-label-secondary);
 }
 
-/* Compact one-line Workspace row after removing the session-count subtitle. */
+/* Compact one-line Workspace row after removing the session-count subtitle.
+   The row box follows the type scale so a smaller type really fits more rows. */
 .projectRow {
-  height: 28px;
+  height: var(--dsh-sidebar-row-height, 28px);
   align-items: center;
   box-sizing: border-box;
 }
@@ -121,7 +122,7 @@
 
 /* Session titles share the workspace icon slot and compact label gap. */
 .sessionRow {
-  height: 28px;
+  height: var(--dsh-sidebar-row-height, 28px);
   gap: 0;
 }
 

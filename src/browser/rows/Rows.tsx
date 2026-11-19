@@ -604,14 +604,15 @@ export function SearchResultItem({
 }
 
 /**
- * One top-level 32px session row: leading 16px cell (status dot, or the
- * leading seat while the row's primary state is idle), title, relative time or
- * compact pending label, and the row actions menu. A row that owns a state dot
- * keeps that cell and renders no seat, so an ambient automation mark never
- * appears beside the row's own state dot. An archived row keeps the cell blank:
- * neither marker renders there, and its live status stays on the hover card.
- * The row accepts Tab focus and opens with unmodified Enter or Space; descendant controls
- * handle their own activation without opening the row.
+ * One session row (the type-scale preset owns its height): leading 16px cell
+ * (status dot, or the leading seat while the row's primary state is idle),
+ * title, relative time or compact pending label, and the row actions menu. A
+ * row that owns a state dot keeps that cell and renders no seat, so an ambient
+ * automation mark never appears beside the row's own state dot. An archived row
+ * keeps the cell blank: neither marker renders there, and its live status stays
+ * on the hover card. The row accepts Tab focus and opens with unmodified Enter
+ * or Space; descendant controls handle their own activation without opening the
+ * row.
  * @param props.node - derived session node.
  * @param props.currentId - selected session id (row highlight).
  * @param props.now - epoch ms for relative-time formatting.

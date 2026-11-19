@@ -1312,6 +1312,9 @@ export function WorkspaceBrowser({
       '--dsh-sidebar-title-line': preset.line,
       '--dsh-sidebar-meta-size': preset.meta,
       '--dsh-sidebar-time-size': preset.time,
+      '--dsh-sidebar-row-height': preset.row,
+      '--dsh-sidebar-row-gap': preset.rowGap,
+      '--dsh-sidebar-group-gap': preset.groupGap,
     } as CSSProperties
   }, [textScale])
   const activeSessionOrders = useMemo<Readonly<Record<string, readonly SessionId[]>>>(() => Object.fromEntries([
