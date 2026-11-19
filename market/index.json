@@ -29,8 +29,8 @@
         "zh": "侧栏视图"
       },
       "description": {
-        "en": "Groups sessions into time buckets (pinned, today, yesterday, this week, earlier) and filters them with status tabs (all, running, awaiting, unread), with each row labelled by workspace. Seats on the shipped sidebar and falls back to it on failure.",
-        "zh": "把会话按时间分桶（置顶、今天、昨天、本周、更早），并用状态标签页筛选（全部、运行中、待确认、待查看），每行标出所属工作区。挂在原生侧栏上，出错自动回退。"
+        "en": "Re-groups sidebar sessions by workspace, workspace tree, flat list or time buckets, filters them with status tabs (all, running, awaiting, unread), and scales the whole list from compact 24px rows to large text; workspace names on each row are optional. Seats on the shipped sidebar and falls back to it on failure.",
+        "zh": "把侧栏会话按工作区、工作区树、单列表或时间分桶重排，用状态标签页筛选（全部、运行中、待确认、待查看），字号三档同时改变行高与间距（24/28/32px），行尾工作区名可按需显示。挂在原生侧栏上，出错自动回退。"
       },
       "author": "Garin",
       "homepage": "https://github.com/GarinZ/dsh-sidebar-view#readme",
@@ -52,6 +52,26 @@
         "sortKeys": {}
       },
       "versions": [
+        {
+          "version": "1.1.1",
+          "publishTimestamp": 1795086401,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-0 <0.3.0"
+          }
+        },
+        {
+          "version": "1.1.0",
+          "publishTimestamp": 1795086267,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-0 <0.3.0"
+          }
+        },
         {
           "version": "1.0.2",
           "publishTimestamp": 1795073808,
