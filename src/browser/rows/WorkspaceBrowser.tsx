@@ -691,7 +691,7 @@ function SessionTree({
 /** The flat "In one list" body: every session is one draggable top-level row. */
 function FlatList({
   list, sessionIds, rowState, onLeaveArchivedOnly, useSessionStatus, useSessionAccess, open, onSessionRenameRequest,
-  usePanelInfo, setSessionOrder, workspaceReady, animationResetKey, statusFilter, workspaceLabelOf,
+  usePanelInfo, setSessionOrder, workspaceReady, animationResetKey, statusFilter,
   revealSessionId, onSessionRevealed, renderSlot, renderFactorySlot, useContextMenuTarget, useContextMenu, home, t,
 }: Pick<
   SessionTreeProps,
@@ -715,8 +715,6 @@ function FlatList({
 > & {
   list: SessionListState
   sessionIds: readonly SessionId[]
-  /** Workspace name per Session: the flat list is cross-project. */
-  workspaceLabelOf: (id: SessionId) => string | undefined
 }) {
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
   const statuses = useSessionStatus(s => s)
@@ -770,7 +768,6 @@ function FlatList({
                 ? () => { onSessionRevealed(node.id) }
                 : undefined}
               useSessionAccess={useSessionAccess}
-              workspaceLabel={workspaceLabelOf(node.id)}
               drag={{
                 start: () => {
                   dropCommitted.current = false
@@ -804,12 +801,12 @@ function FlatList({
 
 /**
  * The flattened cross-project body: pinned rows lead, then the days of the
- * update clock (today, yesterday, this week, earlier). Rows carry their
- * Workspace name, because nothing else in this view says which project a
- * Session belongs to. Buckets fold from their own header.
+ * update clock (today, yesterday, this week, earlier). Rows keep the whole
+ * width for the title; which project a Session belongs to stays on its hover
+ * card. Buckets fold from their own header.
  */
 function TimeGroups({
-  list, sessionIds, rowState, statusFilter, bucketExpansion, onToggleBucket, workspaceLabelOf,
+  list, sessionIds, rowState, statusFilter, bucketExpansion, onToggleBucket,
   onLeaveArchivedOnly, useSessionStatus, useSessionAccess, open, onSessionRenameRequest,
   usePanelInfo, workspaceReady, animationResetKey, revealSessionId, onSessionRevealed,
   renderSlot, renderFactorySlot, useContextMenuTarget, useContextMenu, home, t, setSessionOrder,
@@ -838,8 +835,6 @@ function TimeGroups({
   /** Folded buckets by key; an absent key stays open. */
   bucketExpansion: Readonly<Record<string, boolean>>
   onToggleBucket: (key: SessionTimeBucket, expanded: boolean) => void
-  /** Workspace name of one Session, for the row's cross-project context. */
-  workspaceLabelOf: (id: SessionId) => string | undefined
 }) {
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
   const statuses = useSessionStatus(s => s)
@@ -925,7 +920,6 @@ function TimeGroups({
                   useContextMenuTarget={useContextMenuTarget}
                   onReveal={node.id === revealSessionId ? () => { onSessionRevealed(node.id) } : undefined}
                   useSessionAccess={useSessionAccess}
-                  workspaceLabel={workspaceLabelOf(node.id)}
                   drag={{
                     start: () => {
                       dropCommitted.current = false
@@ -1245,18 +1239,6 @@ export function WorkspaceBrowser({
       unread: rows.filter(row => matchesStatusFilter(row, 'unread')).length,
     }
   }, [list, orderedFlatSessionIds, rowState, sessionStatuses])
-  // Workspace names for the flattened views' row context.
-  const workspaceLabelBySession = useMemo(() => {
-    const labels = new Map<SessionId, string>()
-    for (const workspace of workspaces) {
-      for (const id of workspace.sessionIds) labels.set(id, workspace.title)
-    }
-    return labels
-  }, [workspaces])
-  const workspaceLabelOf = useCallback(
-    (id: SessionId): string | undefined => workspaceLabelBySession.get(id),
-    [workspaceLabelBySession],
-  )
   const activeSessionOrders = useMemo<Readonly<Record<string, readonly SessionId[]>>>(() => Object.fromEntries([
     ...orderedWorkspaces.map(workspace => [workspace.workspaceId, workspace.sessionIds] as const),
     [UNGROUPED_KEY, orderedUngroupedSessionIds] as const,
@@ -1628,7 +1610,6 @@ export function WorkspaceBrowser({
                 statusFilter={statusFilter}
                 bucketExpansion={timeBucketExpansion}
                 onToggleBucket={actions.setTimeBucketExpanded}
-                workspaceLabelOf={workspaceLabelOf}
                 onLeaveArchivedOnly={leaveArchivedOnly}
                 setSessionOrder={saveSessionOrder}
                 workspaceReady={workspaceReady}
@@ -1654,7 +1635,6 @@ export function WorkspaceBrowser({
                   sessionIds={orderedFlatSessionIds}
                   rowState={rowState}
                   statusFilter={statusFilter}
-                  workspaceLabelOf={workspaceLabelOf}
                   onLeaveArchivedOnly={leaveArchivedOnly}
                   workspaceReady={workspaceReady}
                   animationResetKey={`${groupBy}/${orderBy}/${archivedFilter}/${statusFilter}`}

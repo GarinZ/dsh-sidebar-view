@@ -493,19 +493,6 @@
   color: var(--dsw-alias-label-secondary);
 }
 
-/* Cross-project context on a flattened row: a muted, clipped Workspace name
-   between the title and the timestamp. */
-.workspaceChip {
-  flex: none;
-  max-width: 72px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 10px;
-  line-height: 16px;
-  color: var(--dsw-alias-label-tertiary);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .arrow {
     animation: none;

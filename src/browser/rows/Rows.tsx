@@ -632,7 +632,7 @@ export function SearchResultItem({
  */
 export function SessionNodeItem({
   node, currentId, now, onOpen, onRenameRequest, renderSlot, renderFactorySlot, useContextMenuTarget,
-  useContextMenu, onReveal, drag, home, useSessionAccess, t, workspaceLabel,
+  useContextMenu, onReveal, drag, home, useSessionAccess, t,
 }: {
   useContextMenu: WorkspaceBrowserProps['useContextMenu']
   renderFactorySlot: WorkspaceBrowserProps['renderFactorySlot']
@@ -771,9 +771,6 @@ export function SessionNodeItem({
           actions for existing content are available. */}
       {!row.blank && (
         <span className={css.rowResting}>
-          {workspaceLabel !== undefined && (
-            <span className={css.workspaceChip} title={workspaceLabel}>{workspaceLabel}</span>
-          )}
           <span
             className={clsx(css.time, primaryStatus.trailingLabel === undefined && css.timestamp)}
             aria-hidden={primaryStatus.trailingLabel === undefined ? undefined : true}
