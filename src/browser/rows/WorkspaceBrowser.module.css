@@ -61,16 +61,67 @@
   min-width: 200px;
 }
 
-/* Stepped "A" used as the icon of each type-size row: same 16px column as a
-   real icon, so the three options line up with every other menu item. */
-.typeScaleGlyph {
-  display: inline-flex;
+/* Type scale on one row: label left, the three sizes as a segmented track on
+   the right. The row wears the dense menu row's box (30px, 4px/8px padding) so
+   it sits in the same rhythm as the rows around it. */
+.textScaleRow {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  font-weight: 600;
-  line-height: 1;
+  gap: 8px;
+  min-height: 30px;
+  padding: 4px 8px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.textScaleLabel {
+  flex: none;
+}
+
+/* The same translucent track the SegmentedControl primitive uses: the fill
+   reads as a place to choose in, and the raised pill marks the chosen size.
+   The track hugs the right edge, which is the room these rows never spend. */
+.textScaleTrack {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  margin-inline-start: auto;
+  padding: 2px;
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.textScaleOption {
+  height: 22px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+
+@media (hover: hover) {
+  .textScaleOption:hover {
+    color: var(--dsw-alias-label-primary);
+  }
+}
+
+.textScaleOptionOn {
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: var(--dsw-elevation-soft);
+  color: var(--dsw-alias-label-primary);
+}
+
+.textScaleOption:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: -2px;
 }
 
 /* Section header: title, an inline search control, and the two trailing

@@ -144,6 +144,13 @@ function useNativeDragAcceptance(active: boolean): void {
   }, [active])
 }
 
+/** The three type scales in menu order, with the dictionary key of each label. */
+const TEXT_SCALES: readonly { value: TextScale; key: 'textSize.small' | 'textSize.normal' | 'textSize.large' }[] = [
+  { value: 'small', key: 'textSize.small' },
+  { value: 'normal', key: 'textSize.normal' },
+  { value: 'large', key: 'textSize.large' },
+]
+
 /** Grouping, ordering, type scale, and archived-filter menu; own open state so it resets with the wide chrome. */
 function ViewOptionsMenu({
   groupBy, orderBy, archivedFilter, textScale, showWorkspaceName,
@@ -176,14 +183,24 @@ function ViewOptionsMenu({
         { type: 'label' as const, id: 'order-by', text: t('orderBy.label') },
         { id: 'manual', label: t('orderBy.manual'), icon: <IconChevronsUpDownOutlineRegular /> },
         { id: 'updated', label: t('orderBy.updated'), icon: <IconClockOutlineRegular /> },
-        { type: 'separator' as const, id: 'text-size-separator' },
-        { type: 'label' as const, id: 'text-size', text: t('textSize.label') },
-        // The stepped A is the one glyph that reads as "type size"; it also
-        // keeps these rows aligned with the icon column above and below.
-        { id: 'text-small', label: t('textSize.small'), icon: <span aria-hidden className={css.typeScaleGlyph} style={{ fontSize: 10 }}>A</span> },
-        { id: 'text-normal', label: t('textSize.normal'), icon: <span aria-hidden className={css.typeScaleGlyph} style={{ fontSize: 13 }}>A</span> },
-        { id: 'text-large', label: t('textSize.large'), icon: <span aria-hidden className={css.typeScaleGlyph} style={{ fontSize: 16 }}>A</span> },
-        { type: 'separator' as const, id: 'row-detail-separator' },
+        { type: 'separator' as const, id: 'display-separator' },
+      ]}
+      selectedIds={[
+        groupBy,
+        orderBy,
+        ...(showWorkspaceName ? ['show-workspace-name'] : []),
+        { default: 'hide-archived', show: 'show-archived', only: 'only-archived' }[archivedFilter],
+      ]}
+      onSelect={(id) => {
+        if (id === 'workspace' || id === 'workspace-tree' || id === 'flat' || id === 'time') onGroupPick(id)
+        else if (id === 'manual' || id === 'updated') onOrderPick(id)
+        else if (id === 'show-workspace-name') onShowWorkspaceNameToggle(!showWorkspaceName)
+        else if (id === 'hide-archived') onArchivedFilterPick('default')
+        else if (id === 'show-archived') onArchivedFilterPick('show')
+        else if (id === 'only-archived') onArchivedFilterPick('only')
+        setOpen(false)
+      }}
+      footer={[
         {
           id: 'show-workspace-name',
           label: t('viewOptions.showWorkspaceName'),
@@ -195,25 +212,6 @@ function ViewOptionsMenu({
         { id: 'show-archived', label: t('viewOptions.showArchived'), icon: <IconQueueOutlineRegular /> },
         { id: 'only-archived', label: t('viewOptions.onlyArchived'), icon: <IconArchiveCheckOutlineRegular /> },
       ]}
-      selectedIds={[
-        groupBy,
-        orderBy,
-        { small: 'text-small', normal: 'text-normal', large: 'text-large' }[textScale],
-        ...(showWorkspaceName ? ['show-workspace-name'] : []),
-        { default: 'hide-archived', show: 'show-archived', only: 'only-archived' }[archivedFilter],
-      ]}
-      onSelect={(id) => {
-        if (id === 'workspace' || id === 'workspace-tree' || id === 'flat' || id === 'time') onGroupPick(id)
-        else if (id === 'manual' || id === 'updated') onOrderPick(id)
-        else if (id === 'text-small') onTextScalePick('small')
-        else if (id === 'text-normal') onTextScalePick('normal')
-        else if (id === 'text-large') onTextScalePick('large')
-        else if (id === 'show-workspace-name') onShowWorkspaceNameToggle(!showWorkspaceName)
-        else if (id === 'hide-archived') onArchivedFilterPick('default')
-        else if (id === 'show-archived') onArchivedFilterPick('show')
-        else if (id === 'only-archived') onArchivedFilterPick('only')
-        setOpen(false)
-      }}
       align="end"
       dense
       listClassName={css.viewOptionsMenu}
@@ -232,7 +230,29 @@ function ViewOptionsMenu({
           </button>
         </Tooltip>
       )}
-    />
+    >
+      {/* One row for the whole preference: the label on the left, the three
+          sizes as a segmented track on the right. A menu row per size spent
+          four rows of the panel's height on it; this spends the width that
+          the sparse rows above never use, and the menu stays open so the
+          list behind can be judged at the picked size. */}
+      <div className={css.textScaleRow} role="group" aria-label={t('textSize.label')}>
+        <span className={css.textScaleLabel}>{t('textSize.label')}</span>
+        <span className={css.textScaleTrack}>
+          {TEXT_SCALES.map(({ value, key }) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={textScale === value}
+              className={clsx(css.textScaleOption, textScale === value && css.textScaleOptionOn)}
+              onClick={() => { onTextScalePick(value) }}
+            >
+              {t(key)}
+            </button>
+          ))}
+        </span>
+      </div>
+    </Menu>
   )
 }
 
