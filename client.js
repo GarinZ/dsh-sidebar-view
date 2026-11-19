@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({id:"dsh-sidebar-view",factory:require=>{var module={exports:{}};var exports=module.exports;
-;try{console.info('[dsh-sidebar-view] build 2026-11-19T10:49:43.571Z')}catch(e){}
+;try{console.info('[dsh-sidebar-view] build 2026-11-19T10:59:09.327Z')}catch(e){}
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -43,7 +43,7 @@ var React = __toESM(require("react"), 1);
 // src/browser/rows/WorkspaceBrowser.tsx
 var import_react4 = require("react");
 
-// ../sidebar-view/node_modules/clsx/dist/clsx.mjs
+// node_modules/clsx/dist/clsx.mjs
 function r(e) {
   var t, f, n = "";
   if ("string" == typeof e || "number" == typeof e) n += e;
@@ -256,13 +256,13 @@ function WorkspaceDialogs({ request, workspaces, renameWorkspace, deleteWorkspac
 // src/browser/rows/WorkspaceBrowser.tsx
 var import_dsh_client_ui_primitives4 = require("@deepseek-ai/dsh-client-ui-primitives");
 
-// ../sidebar-view/node_modules/@deepseek-ai/dsh-api-workspace-controller/lib/types/default-workspace.js
+// node_modules/@deepseek-ai/dsh-api-workspace-controller/lib/types/default-workspace.js
 var DEFAULT_WORKSPACE_DIRECTORY = "default-workspace";
 function workspaceDisplayTitle(title, localizedDefault) {
   return title === DEFAULT_WORKSPACE_DIRECTORY ? localizedDefault : title;
 }
 
-// ../sidebar-view/node_modules/@deepseek-ai/dsh-util-values/lib/index.js
+// node_modules/@deepseek-ai/dsh-util-values/lib/index.js
 var SIMPLE_ESCAPES = {
   '"': '"',
   "\\": "\\",
@@ -884,7 +884,7 @@ function assertNever(value, context) {
   throw new Error(`unreachable variant${context ? ` in ${context}` : ""}: ${rendered}`);
 }
 
-// ../sidebar-view/node_modules/@deepseek-ai/dsh-util-workspace-path/lib/index.js
+// node_modules/@deepseek-ai/dsh-util-workspace-path/lib/index.js
 function isWindowsStylePath(value) {
   return /^[A-Za-z]:[/\\]/.test(value) || value.startsWith("\\\\");
 }
