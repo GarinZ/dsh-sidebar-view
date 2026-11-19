@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Sidebar View",
+    "description": "Adds a time-grouped view and status tabs to the sidebar, while keeping the shipped session browser's search, menus, and drag order."
+  }
+}

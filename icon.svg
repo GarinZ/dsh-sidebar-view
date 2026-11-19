@@ -1,0 +1,19 @@
+<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M10.5 10.5V25.5" stroke="url(#dsh-sidebar-view-spine)" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="10.5" cy="10.5" r="2.2" fill="#7FA6E8"/>
+  <circle cx="10.5" cy="18" r="2.2" fill="#7FA6E8"/>
+  <circle cx="10.5" cy="25.5" r="2.2" fill="#7FA6E8"/>
+  <path d="M16 10.5H25.5" stroke="url(#dsh-sidebar-view-rows)" stroke-width="3.4" stroke-linecap="round"/>
+  <path d="M16 18H29.5" stroke="url(#dsh-sidebar-view-rows)" stroke-width="3.4" stroke-linecap="round"/>
+  <path d="M16 25.5H24" stroke="url(#dsh-sidebar-view-rows)" stroke-width="3.4" stroke-linecap="round"/>
+  <defs>
+    <linearGradient id="dsh-sidebar-view-rows" x1="16" y1="10.5" x2="29.5" y2="25.5" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7CB7FF"/>
+      <stop offset="1" stop-color="#3E58D6"/>
+    </linearGradient>
+    <linearGradient id="dsh-sidebar-view-spine" x1="10.5" y1="10.5" x2="10.5" y2="25.5" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A8CBFF"/>
+      <stop offset="1" stop-color="#6B86DC"/>
+    </linearGradient>
+  </defs>
+</svg>

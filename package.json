@@ -1,6 +1,7 @@
 {
   "name": "dsh-sidebar-view",
-  "version": "1.0.1",
+  "version": "1.0.2",
+  "icon": "icon.svg",
   "description": "Adds a time-grouped view and status tabs to the DeepSeek Harness sidebar by seating on the shipped workspace browser: the shipped package stays enabled, the plugin never registers services, and any failure falls back to the shipped UI.",
   "type": "module",
   "main": "./index.js",
@@ -8,12 +9,16 @@
     ".": "./index.js",
     "./client": "./client.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
+    "./icon": "./icon.svg",
+    "./locale/*.json": "./locale/*.json",
     "./package.json": "./package.json"
   },
   "files": [
     "index.js",
     "client.js",
     "cordis.patch.yml",
+    "icon.svg",
+    "locale/*.json",
     "README.md",
     "README.en.md"
   ],

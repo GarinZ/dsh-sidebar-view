@@ -23,6 +23,7 @@
   "plugins": [
     {
       "name": "dsh-sidebar-view",
+      "icon": "icon.svg",
       "title": {
         "en": "Sidebar View",
         "zh": "侧栏视图"

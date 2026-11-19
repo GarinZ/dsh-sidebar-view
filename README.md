@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/GarinZ/dsh-sidebar-view/main/icon.svg" width="64" height="64" alt="Sidebar View 图标">
+</p>
+
 # dsh-sidebar-view
 
 简体中文 | [English](README.en.md)
