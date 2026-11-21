@@ -225,7 +225,9 @@ const PICKED = [
   'appearance.reset', 'appearance.done', 'appearance.noColor',
   'appearance.tag.name', 'appearance.tag.placeholder', 'appearance.tag.save',
   'appearance.tag.create', 'appearance.tag.new', 'appearance.tag.untagged',
-  'appearance.tag.delete', 'appearance.tag.confirmDelete',
+  'appearance.tag.delete', 'appearance.tag.edit', 'appearance.tag.editing',
+  'appearance.tag.deleteTitle', 'appearance.tag.deleteBody', 'appearance.tag.deleteBodyNone',
+  'appearance.tag.confirm', 'appearance.cancel',
   'appearance.group.work', 'appearance.group.tech', 'appearance.group.nature', 'appearance.group.life',
   'appearance.group.create', 'appearance.group.misc', 'appearance.group.animals', 'appearance.group.food',
   'appearance.group.fun', 'appearance.group.symbols',
@@ -273,7 +275,15 @@ function translateFor(shipped: Translate): Translate {
   }
   return (key: string, params?: Record<string, unknown>): string => {
     const local = dict[key]
-    if (local !== undefined) return local
+    if (local !== undefined) {
+      if (params === undefined) return local
+      // Our dictionaries are plain templates, so fill {name}/{count} here
+      // instead of borrowing the shipped formatter's placeholders.
+      return local.replace(/\{(\w+)\}/g, (token, name: string) => {
+        const value = params[name]
+        return value === undefined ? token : String(value)
+      })
+    }
     try { return shipped(key, params) } catch { return key }
   }
 }

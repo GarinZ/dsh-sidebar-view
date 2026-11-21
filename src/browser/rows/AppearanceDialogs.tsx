@@ -8,7 +8,9 @@
  */
 import * as React from 'react'
 import { createPortal } from 'react-dom'
-import { IconFolderOpenRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import {
+  IconCloseOutlineRegular, IconEditOutlineRegular, IconFolderOpenRegular, Modal,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import clsx from 'clsx'
 import {
   EMOJI_GROUPS, ICON_GROUPS, MAX_TAG_NAME, SESSION_COLORS, formatIconSpec, parseIconSpec, searchIcons,
@@ -16,7 +18,8 @@ import {
 } from '../appearance.ts'
 import { AppearanceIcon } from '../appearance-icon.tsx'
 import {
-  getAppearanceRequest, requestAppearance, subscribeAppearanceRequest, type AppearanceRequest,
+  getAppearanceRequest, requestAppearance, subscribeAppearanceRequest,
+  type AppearanceAnchor, type AppearanceRequest,
 } from '../appearance-request.ts'
 import css from './AppearanceDialogs.module.css'
 
@@ -39,7 +42,7 @@ export interface AppearanceDialogsProps {
   onCreateTag: (sessionId: string, name: string, color: string) => void
   /** Rename or recolor an existing tag; every Session wearing it follows. */
   onUpdateTag: (tagId: string, name: string, color: string) => void
-  /** Drop a tag and untag every Session that wore it. */
+  /** Drop a tag and untag every Session that wore it; the picker only asks. */
   onDeleteTag: (tagId: string) => void
 }
 
@@ -57,11 +60,64 @@ export interface AppearanceDialogsProps {
  */
 export function AppearanceDialogs(props: AppearanceDialogsProps) {
   const request = React.useSyncExternalStore(subscribeAppearanceRequest, getAppearanceRequest)
-  if (request === null) return null
+  // Deleting a tag is a statement about the tag itself, not about the Session
+  // whose picker asked, so it leaves the popover behind and asks in a dialog
+  // that names the reference count. Keeping the ask inside the popover made it
+  // read as “clear this Session's tag”, one row above the real 无标签 button.
+  const [pendingDeleteId, setPendingDeleteId] = React.useState<string | null>(null)
+  const { t } = props
   const close = (): void => { requestAppearance(null) }
-  return request.kind === 'workspace-icon'
-    ? <WorkspaceIconPicker key={request.workspaceId} request={request} close={close} {...props} />
-    : <SessionTagPicker key={request.sessionId} request={request} close={close} {...props} />
+  const pending = pendingDeleteId === null ? undefined : props.tags.find(tag => tag.id === pendingDeleteId)
+  const usedBy = pendingDeleteId === null
+    ? 0
+    : Object.values(props.sessionTags).filter(id => id === pendingDeleteId).length
+  const pendingName = pending === undefined ? '' : tagName(pending, t)
+  const dismissDelete = (): void => { setPendingDeleteId(null) }
+  const confirmDelete = (): void => {
+    if (pendingDeleteId !== null) props.onDeleteTag(pendingDeleteId)
+    setPendingDeleteId(null)
+  }
+  return (
+    <>
+      {request !== null && request.kind === 'workspace-icon' && (
+        <WorkspaceIconPicker key={request.workspaceId} request={request} close={close} {...props} />
+      )}
+      {request !== null && request.kind === 'session-tag' && (
+        <SessionTagPicker
+          key={request.sessionId}
+          request={request}
+          close={close}
+          {...props}
+          onDeleteRequest={(tagId) => { close(); setPendingDeleteId(tagId) }}
+        />
+      )}
+      <Modal
+        open={pending !== undefined}
+        onClose={dismissDelete}
+        title={t('appearance.tag.deleteTitle')}
+        description={pending === undefined
+          ? ''
+          : usedBy === 0
+            ? t('appearance.tag.deleteBodyNone', { name: pendingName })
+            : t('appearance.tag.deleteBody', { name: pendingName, count: usedBy })}
+        closeLabel={t('appearance.cancel')}
+        footer={(
+          <>
+            <button type="button" className={css.textButton} onClick={dismissDelete} data-modal-autofocus>
+              {t('appearance.cancel')}
+            </button>
+            <button
+              type="button"
+              className={clsx(css.primaryButton, css.dangerPrimary)}
+              onClick={confirmDelete}
+            >
+              {t('appearance.tag.confirm')}
+            </button>
+          </>
+        )}
+      />
+    </>
+  )
 }
 
 /**
@@ -321,12 +377,13 @@ function WorkspaceIconPicker({ request, close, t, workspaceIcons, onWorkspaceIco
 }
 
 /**
- * Named colour tags for one Session. Picking a tag applies it and dismisses;
- * the editor below renames or recolours the tag the Session already wears, so
- * the row behind the popover updates as you type. The palette only stages a
- * colour while a new tag is being created.
+ * Named colour tags for one Session. One row per tag: the name applies it and
+ * dismisses, the pencil loads it into the editor below, and the × asks to
+ * delete the tag itself (naming its reference count) instead of clearing this
+ * Session. The editor renames or recolours whichever tag is loaded, so the row
+ * behind the popover follows a colour pick immediately.
  */
-function SessionTagPicker({ request, close, t, tags, sessionTags, onAssignTag, onCreateTag, onUpdateTag, onDeleteTag }: {
+function SessionTagPicker({ request, close, t, tags, sessionTags, onAssignTag, onCreateTag, onUpdateTag, onDeleteRequest }: {
   request: Extract<AppearanceRequest, { kind: 'session-tag' }>
   close: () => void
   t: Translate
@@ -335,38 +392,41 @@ function SessionTagPicker({ request, close, t, tags, sessionTags, onAssignTag, o
   onAssignTag: AppearanceDialogsProps['onAssignTag']
   onCreateTag: AppearanceDialogsProps['onCreateTag']
   onUpdateTag: AppearanceDialogsProps['onUpdateTag']
-  onDeleteTag: AppearanceDialogsProps['onDeleteTag']
+  onDeleteRequest: (tagId: string) => void
 }) {
   const currentId = sessionTags[request.sessionId]
   const current = currentId === undefined ? undefined : tags.find(tag => tag.id === currentId)
-  const [mode, setMode] = React.useState<'edit' | 'create'>(current === undefined ? 'create' : 'edit')
+  // The editor always edits one concrete tag, or none while creating one.
+  // Opening on a Session that already wears a tag lands on it, so renaming is
+  // one click away; the pencil beside any other tag moves the editor there.
+  const [editId, setEditId] = React.useState<string | null>(current?.id ?? null)
+  const target = editId === null ? undefined : tags.find(tag => tag.id === editId)
   const [name, setName] = React.useState(current?.name ?? '')
   const [color, setColor] = React.useState<SessionColorId>(current?.color ?? 'blue')
-  const editing = mode === 'edit' && current !== undefined
-  // A tag is shared by every Session wearing it, so deleting asks once inside
-  // the popover instead of opening a second dialog. The ask stays put until the
-  // popover closes on its own: a timed disarm would silently turn a deliberate
-  // second click into a fresh ask, which reads as a dead button.
-  const [confirmDelete, setConfirmDelete] = React.useState(false)
 
   const assign = (tag: TagDefinition): void => {
     onAssignTag(request.sessionId, tag.id)
     close()
   }
+  const startEdit = (tag: TagDefinition): void => {
+    setEditId(tag.id)
+    setName(tag.name)
+    setColor(tag.color)
+  }
   const startCreate = (): void => {
-    setMode('create')
+    setEditId(null)
     setName('')
-    setConfirmDelete(false)
+    setColor('blue')
   }
   const pickColor = (id: SessionColorId): void => {
     setColor(id)
-    // Recolouring the tag the Session already wears is a live edit: every row
-    // in that group follows at once.
-    if (current !== undefined && mode === 'edit') onUpdateTag(current.id, current.name, id)
+    // Recolouring an existing tag is a live edit: every row in that group and
+    // this Session's dot follow at once. Renaming still waits for 保存.
+    if (target !== undefined) onUpdateTag(target.id, target.name, id)
   }
   const commit = (): void => {
     const trimmed = name.trim()
-    if (current !== undefined && mode === 'edit') onUpdateTag(current.id, trimmed, color)
+    if (target !== undefined) onUpdateTag(target.id, trimmed === '' ? target.name : trimmed, color)
     else onCreateTag(request.sessionId, trimmed, color)
     close()
   }
@@ -374,44 +434,60 @@ function SessionTagPicker({ request, close, t, tags, sessionTags, onAssignTag, o
     onAssignTag(request.sessionId, null)
     close()
   }
-  const remove = (): void => {
-    if (current === undefined) return
-    if (!confirmDelete) {
-      setConfirmDelete(true)
-      return
-    }
-    onDeleteTag(current.id)
-    close()
-  }
 
   return (
     <PickerPopover request={request} title={t('appearance.color.title')} close={close}>
       <Head title={t('appearance.color.title')} scope={request.displayTitle} />
       {tags.length > 0 && (
-        <div className={css.tagList} role="group" aria-label={t('appearance.color.title')}>
+        <div className={css.tagRows} role="group" aria-label={t('appearance.color.title')}>
           {tags.map(tag => {
             const on = tag.id === currentId
+            const label = tagName(tag, t)
             return (
-              <button
-                key={tag.id}
-                type="button"
-                className={clsx(css.tagChip, on && css.tagChipOn)}
-                aria-pressed={on}
-                title={tagName(tag, t)}
-                onClick={() => { assign(tag) }}
-              >
-                <span className={css.tagChipDot} style={{ backgroundColor: sessionColorHex(tag.color) }} aria-hidden />
-                <span className={css.tagChipLabel}>{tagName(tag, t)}</span>
-              </button>
+              <div key={tag.id} className={clsx(css.tagRow, on && css.tagRowOn, editId === tag.id && css.tagRowEditing)}>
+                <button
+                  type="button"
+                  className={css.tagRowMain}
+                  aria-pressed={on}
+                  title={label}
+                  onClick={() => { assign(tag) }}
+                >
+                  <span className={css.tagRowDot} style={{ backgroundColor: sessionColorHex(tag.color) }} aria-hidden />
+                  <span className={css.tagRowLabel}>{label}</span>
+                </button>
+                <button
+                  type="button"
+                  className={css.tagRowAction}
+                  aria-label={t('appearance.tag.edit') + ': ' + label}
+                  title={t('appearance.tag.edit')}
+                  onClick={() => { startEdit(tag) }}
+                >
+                  <IconEditOutlineRegular size={13} />
+                </button>
+                <button
+                  type="button"
+                  className={clsx(css.tagRowAction, css.tagRowDanger)}
+                  aria-label={t('appearance.tag.delete') + ': ' + label}
+                  title={t('appearance.tag.delete')}
+                  onClick={() => { onDeleteRequest(tag.id) }}
+                >
+                  <IconCloseOutlineRegular size={13} />
+                </button>
+              </div>
             )
           })}
-          {editing && (
-            <button type="button" className={css.tagChip} onClick={startCreate}>
-              + {t('appearance.tag.new')}
-            </button>
-          )}
         </div>
       )}
+      {editId !== null && (
+        <button type="button" className={css.tagRowNew} onClick={startCreate}>
+          + {t('appearance.tag.new')}
+        </button>
+      )}
+      <div className={css.editorLabel}>
+        {target === undefined
+          ? t('appearance.tag.new')
+          : t('appearance.tag.editing', { name: tagName(target, t) })}
+      </div>
       <div className={css.swatches}>
         {SESSION_COLORS.map(option => {
           const on = color === option.id
@@ -452,23 +528,13 @@ function SessionTagPicker({ request, close, t, tags, sessionTags, onAssignTag, o
         <button type="button" className={css.textButton} onClick={clear}>
           {t('appearance.noColor')}
         </button>
-        {editing && (
-          <button
-            type="button"
-            className={clsx(css.textButton, css.dangerButton, confirmDelete && css.dangerArmed)}
-            onClick={remove}
-          >
-            {confirmDelete ? t('appearance.tag.confirmDelete') : t('appearance.tag.delete')}
-          </button>
-        )}
         <span className={css.currentGlyph} aria-hidden>
           <span className={css.swatch} style={{ backgroundColor: sessionColorHex(color) }} />
         </span>
         <button type="button" className={css.primaryButton} onClick={commit}>
-          {editing ? t('appearance.tag.save') : t('appearance.tag.create')}
+          {target === undefined ? t('appearance.tag.create') : t('appearance.tag.save')}
         </button>
       </footer>
     </PickerPopover>
   )
 }
-
