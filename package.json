@@ -1,6 +1,6 @@
 {
   "name": "dsh-sidebar-view",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "icon": "icon.svg",
   "description": "Adds a time-grouped view and status tabs to the DeepSeek Harness sidebar by seating on the shipped workspace browser: the shipped package stays enabled, the plugin never registers services, and any failure falls back to the shipped UI.",
   "type": "module",
