@@ -20,7 +20,7 @@ import * as React from 'react'
 import { MenuItemButton } from '@deepseek-ai/dsh-client-ui-primitives'
 import { isSessionColorId, parseIconSpec } from '../browser/appearance.ts'
 import { AppearanceIcon } from '../browser/appearance-icon.tsx'
-import { requestAppearance } from '../browser/appearance-request.ts'
+import { requestAppearance, type AppearanceAnchor } from '../browser/appearance-request.ts'
 import { WorkspaceBrowser } from '../browser/rows/WorkspaceBrowser.tsx'
 import { de, en, es, fr, ja, pt, ru, zh } from '../browser/locales.ts'
 import { isTextScale, type TextScale } from '../browser/stores.ts'
@@ -236,6 +236,18 @@ type SessionColorItemProps = {
   useMenuOpenState: UseMenuOpenState
 }
 
+/**
+ * Viewport rect of a sidebar row, so the picker can open beside the row it
+ * edits instead of covering the window.
+ * @param rowKey - the row's data-row-key ("workspace:<id>" or "session:<id>").
+ */
+function anchorFor(rowKey: string): AppearanceAnchor | undefined {
+  const row = document.querySelector(`[data-row-key="${CSS.escape(rowKey)}"]`)
+  if (row === null) return undefined
+  const rect = row.getBoundingClientRect()
+  return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }
+}
+
 /** The palette glyph shared by the workspace and session menu rows. */
 function PaletteIcon(): React.ReactElement {
   return React.createElement(AppearanceIcon, { spec: { kind: 'icon', value: 'palette' }, size: 16 })
@@ -254,7 +266,7 @@ function SessionColorMenuItem(props: SessionColorItemProps & { t: Translate }): 
     icon: React.createElement(PaletteIcon),
     onSelect: () => {
       setMenuOpen(false)
-      requestAppearance({ kind: 'session-color', sessionId, displayTitle })
+      requestAppearance({ kind: 'session-color', sessionId, displayTitle, anchor: anchorFor('session:' + sessionId) })
     },
   }, t('appearance.sessionColor'))
 }
@@ -396,7 +408,7 @@ export function apply(ctx: AnyCtx): void {
         id: 'icon',
         label: t('appearance.workspaceIcon'),
         icon: { key: 'workspace.appearance' },
-        run: () => { requestAppearance({ kind: 'workspace-icon', workspaceId, displayTitle }) },
+        run: () => { requestAppearance({ kind: 'workspace-icon', workspaceId, displayTitle, anchor: anchorFor('workspace:' + workspaceId) }) },
       }],
     }), 'dsh-sidebar-view: workspace icon menu action')
   }

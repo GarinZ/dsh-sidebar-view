@@ -1,12 +1,14 @@
 /**
- * The two appearance pickers. They live inside the sidebar browser (not
- * shell.overlay) because the browser owns the composite locale seat and the
- * appearance actions; the client half only opens them through the request
- * store. Every pick applies immediately — the modal stays open so the effect
- * is visible on the rows behind it.
+ * The two appearance pickers. They render as small popovers pinned beside the
+ * row that opened them — not as a window-covering modal — so the change is
+ * visible on the rows around it while you pick. They live inside the sidebar
+ * browser (not shell.overlay) because the browser owns the composite locale
+ * seat and the appearance actions; the client half only opens them through the
+ * request store.
  */
 import * as React from 'react'
-import { Button, IconFolderOpenRegular, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { createPortal } from 'react-dom'
+import { IconFolderOpenRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import clsx from 'clsx'
 import {
   EMOJI_GROUPS, ICON_GROUPS, SESSION_COLORS, formatIconSpec, parseIconSpec, searchIcons, sessionColorHex,
@@ -19,6 +21,10 @@ import {
 import css from './AppearanceDialogs.module.css'
 
 type Translate = (key: string, params?: Record<string, unknown>) => string
+
+/** Distance from the anchor row, and from the viewport edges. */
+const ANCHOR_GAP = 6
+const VIEWPORT_MARGIN = 8
 
 /** Everything the pickers read and write; the browser root owns all of it. */
 export interface AppearanceDialogsProps {
@@ -35,50 +41,111 @@ export interface AppearanceDialogsProps {
  * @param props.sessionColors - stored palette ids by Session id.
  * @param props.onWorkspaceIcon - write hop (null restores the folder glyph).
  * @param props.onSessionColor - write hop (null clears the accent).
- * @returns the picker the request store names, or null.
+ * @returns the popover the request store names, or null.
  */
 export function AppearanceDialogs(props: AppearanceDialogsProps) {
   const request = React.useSyncExternalStore(subscribeAppearanceRequest, getAppearanceRequest)
   if (request === null) return null
   const close = (): void => { requestAppearance(null) }
   return request.kind === 'workspace-icon'
-    ? <WorkspaceIconDialog key={request.workspaceId} request={request} close={close} {...props} />
-    : <SessionColorDialog key={request.sessionId} request={request} close={close} {...props} />
+    ? <WorkspaceIconPicker key={request.workspaceId} request={request} close={close} {...props} />
+    : <SessionColorPicker key={request.sessionId} request={request} close={close} {...props} />
 }
 
-/** The open dialog's shell: title, one scrolling surface, and the footer pair. */
-function PickerModal({ title, close, t, footer, children }: {
+/**
+ * A fixed panel beside the anchor row, kept inside the viewport and flipped to
+ * the row's other side when the right edge would overflow. Height changes (tab
+ * switches, search results) re-place it through a resize observer.
+ */
+function PickerPopover({ request, title, close, children }: {
+  request: AppearanceRequest
   title: string
   close: () => void
-  t: Translate
-  footer: React.ReactNode
   children: React.ReactNode
 }) {
-  return (
-    <Modal open onClose={close} closeLabel={t('close')} title={title} footer={footer}>
-      <div className={css.body}>{children}</div>
-    </Modal>
+  const panelRef = React.useRef<HTMLDivElement>(null)
+  const [position, setPosition] = React.useState<{ left: number; top: number } | null>(null)
+  const closeRef = React.useRef(close)
+  closeRef.current = close
+
+  React.useLayoutEffect(() => {
+    const panel = panelRef.current
+    if (panel === null) return
+    const place = (): void => {
+      const width = panel.offsetWidth
+      const height = panel.offsetHeight
+      const viewportWidth = window.innerWidth
+      const viewportHeight = window.innerHeight
+      const anchor = request.anchor
+      let left = anchor === undefined ? viewportWidth / 2 - width / 2 : anchor.right + ANCHOR_GAP
+      let top = anchor === undefined ? viewportHeight / 3 : anchor.top
+      if (left + width > viewportWidth - VIEWPORT_MARGIN) {
+        left = anchor === undefined ? viewportWidth - width - VIEWPORT_MARGIN : anchor.left - ANCHOR_GAP - width
+      }
+      left = Math.max(VIEWPORT_MARGIN, Math.min(left, viewportWidth - width - VIEWPORT_MARGIN))
+      top = Math.max(VIEWPORT_MARGIN, Math.min(top, viewportHeight - height - VIEWPORT_MARGIN))
+      setPosition({ left, top })
+    }
+    place()
+    const observer = new ResizeObserver(place)
+    observer.observe(panel)
+    return () => { observer.disconnect() }
+  }, [request])
+
+  React.useEffect(() => {
+    panelRef.current?.focus()
+    const onPointerDown = (event: PointerEvent): void => {
+      if (panelRef.current?.contains(event.target as Node) === true) return
+      closeRef.current()
+    }
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      event.stopPropagation()
+      closeRef.current()
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    document.addEventListener('keydown', onKeyDown, true)
+    window.addEventListener('scroll', () => { closeRef.current() }, true)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true)
+      document.removeEventListener('keydown', onKeyDown, true)
+    }
+  }, [])
+
+  return createPortal(
+    <div
+      ref={panelRef}
+      role="dialog"
+      aria-label={title}
+      tabIndex={-1}
+      className={css.panel}
+      style={{
+        left: position?.left ?? 0,
+        top: position?.top ?? 0,
+        visibility: position === null ? 'hidden' : 'visible',
+      }}
+    >
+      {children}
+    </div>,
+    document.body,
   )
 }
 
-/** Workspace identity row shared by both pickers. */
-function Preview({ title, hint, glyph }: { title: string; hint: string; glyph: React.ReactNode }) {
+/** Title plus the entity the picker edits, clamped to one line each. */
+function Head({ title, scope }: { title: string; scope: string }) {
   return (
-    <div className={css.preview}>
-      <span className={css.previewGlyph}>{glyph}</span>
-      <span className={css.previewText}>
-        <span className={css.previewTitle}>{title}</span>
-        <span className={css.previewHint}>{hint}</span>
-      </span>
-    </div>
+    <header className={css.head}>
+      <span className={css.headTitle}>{title}</span>
+      <span className={css.headScope} title={scope}>{scope}</span>
+    </header>
   )
 }
 
 /**
- * Emoji-or-icon picker for one Workspace. The tab is owned here so switching
- * between the faces keeps the current choice visible in the preview.
+ * Emoji-or-icon picker for one Workspace. Applying a pick keeps the popover
+ * open so the row behind it can be compared against the next candidate.
  */
-function WorkspaceIconDialog({ request, close, t, workspaceIcons, onWorkspaceIcon }: {
+function WorkspaceIconPicker({ request, close, t, workspaceIcons, onWorkspaceIcon }: {
   request: Extract<AppearanceRequest, { kind: 'workspace-icon' }>
   close: () => void
   t: Translate
@@ -91,24 +158,10 @@ function WorkspaceIconDialog({ request, close, t, workspaceIcons, onWorkspaceIco
   const pick = (spec: IconSpec): void => { onWorkspaceIcon(request.workspaceId, formatIconSpec(spec)) }
   const matches = query.trim() === '' ? null : searchIcons(query)
   return (
-    <PickerModal
-      title={t('appearance.icon.title')}
-      close={close}
-      t={t}
-      footer={(
-        <>
-          <Button variant="outline" onClick={() => { onWorkspaceIcon(request.workspaceId, null) }}>{t('appearance.reset')}</Button>
-          <Button variant="primary" onClick={close}>{t('appearance.done')}</Button>
-        </>
-      )}
-    >
-      <Preview
-        title={request.displayTitle}
-        hint={t('appearance.icon.hint')}
-        glyph={current === null ? <IconFolderOpenRegular size={20} /> : <AppearanceIcon spec={current} size={24} />}
-      />
-      <div className={css.faceRow} role="group" aria-label={t('appearance.icon.title')}>
-        <div className={css.tabs}>
+    <PickerPopover request={request} title={t('appearance.icon.title')} close={close}>
+      <Head title={t('appearance.icon.title')} scope={request.displayTitle} />
+      <div className={css.toolbar}>
+        <div className={css.tabs} role="group" aria-label={t('appearance.icon.title')}>
           <button type="button" aria-pressed={face === 'emoji'} className={clsx(css.tab, face === 'emoji' && css.tabOn)} onClick={() => { setFace('emoji') }}>
             {t('appearance.tab.emoji')}
           </button>
@@ -122,7 +175,7 @@ function WorkspaceIconDialog({ request, close, t, workspaceIcons, onWorkspaceIco
             value={query}
             placeholder={t('appearance.search')}
             aria-label={t('appearance.search')}
-            onChange={(e) => { setQuery(e.target.value) }}
+            onChange={(event) => { setQuery(event.target.value) }}
           />
         )}
       </div>
@@ -199,15 +252,24 @@ function WorkspaceIconDialog({ request, close, t, workspaceIcons, onWorkspaceIco
           </section>
         ))}
       </div>
-    </PickerModal>
+      <footer className={css.footer}>
+        <button type="button" className={css.textButton} onClick={() => { onWorkspaceIcon(request.workspaceId, null) }}>
+          {t('appearance.reset')}
+        </button>
+        <span className={css.currentGlyph} aria-hidden>
+          {current === null ? <IconFolderOpenRegular size={14} /> : <AppearanceIcon spec={current} size={14} />}
+        </span>
+        <button type="button" className={css.primaryButton} onClick={close}>{t('appearance.done')}</button>
+      </footer>
+    </PickerPopover>
   )
 }
 
 /**
  * Nine-hue palette for one Session. The accent shows as the row's leading dot,
- * so the preview repeats that dot rather than a title swatch.
+ * so picking one applies and dismisses — the row behind updates in place.
  */
-function SessionColorDialog({ request, close, t, sessionColors, onSessionColor }: {
+function SessionColorPicker({ request, close, t, sessionColors, onSessionColor }: {
   request: Extract<AppearanceRequest, { kind: 'session-color' }>
   close: () => void
   t: Translate
@@ -216,21 +278,14 @@ function SessionColorDialog({ request, close, t, sessionColors, onSessionColor }
 }) {
   const current = sessionColors[request.sessionId]
   const hex = sessionColorHex(current)
+  const choose = (color: string | null): void => {
+    onSessionColor(request.sessionId, color)
+    close()
+  }
   return (
-    <PickerModal
-      title={t('appearance.color.title')}
-      close={close}
-      t={t}
-      footer={<Button variant="primary" onClick={close}>{t('appearance.done')}</Button>}
-    >
-      <Preview
-        title={request.displayTitle}
-        hint={t('appearance.color.hint')}
-        glyph={hex === undefined
-          ? <span className={css.plainDot} aria-hidden />
-          : <span className={css.previewDot} style={{ backgroundColor: hex }} aria-hidden />}
-      />
-      <div className={css.colorGrid}>
+    <PickerPopover request={request} title={t('appearance.color.title')} close={close}>
+      <Head title={t('appearance.color.title')} scope={request.displayTitle} />
+      <div className={css.swatches}>
         {SESSION_COLORS.map(color => {
           const on = current === color.id
           const label = t('appearance.color.' + color.id)
@@ -238,27 +293,26 @@ function SessionColorDialog({ request, close, t, sessionColors, onSessionColor }
             <button
               key={color.id}
               type="button"
-              className={clsx(css.colorCell, on && css.colorCellOn)}
+              className={clsx(css.swatchButton, on && css.swatchOn)}
               aria-pressed={on}
               aria-label={label}
               title={label}
-              onClick={() => { onSessionColor(request.sessionId, color.id) }}
+              onClick={() => { choose(color.id) }}
             >
               <span className={css.swatch} style={{ backgroundColor: color.hex }} aria-hidden />
-              <span className={css.colorName}>{label}</span>
-              {on && <span className={css.check} aria-hidden>✓</span>}
             </button>
           )
         })}
       </div>
       <button
         type="button"
-        className={clsx(css.clearCell, hex === undefined && css.clearCellOn)}
+        className={clsx(css.clearRow, hex === undefined && css.clearRowOn)}
         aria-pressed={hex === undefined}
-        onClick={() => { onSessionColor(request.sessionId, null) }}
+        onClick={() => { choose(null) }}
       >
+        <span className={css.plainDot} aria-hidden />
         {t('appearance.noColor')}
       </button>
-    </PickerModal>
+    </PickerPopover>
   )
 }

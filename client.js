@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({id:"dsh-sidebar-view",factory:require=>{var module={exports:{}};var exports=module.exports;
-;try{console.info('[dsh-sidebar-view] build 2026-11-21T07:01:46.997Z')}catch(e){}
+;try{console.info('[dsh-sidebar-view] build 2026-11-21T07:18:52.091Z')}catch(e){}
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -634,19 +634,16 @@ var clsx_default = clsx;
 
 // src/browser/rows/AppearanceDialogs.tsx
 var React = __toESM(require("react"), 1);
+var import_react_dom = require("react-dom");
 var import_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // src/browser/rows/AppearanceDialogs.module.css
 var AppearanceDialogs_default = {
-  body: "AppearanceDialogs_body",
-  preview: "AppearanceDialogs_preview",
-  previewGlyph: "AppearanceDialogs_previewGlyph",
-  previewText: "AppearanceDialogs_previewText",
-  previewTitle: "AppearanceDialogs_previewTitle",
-  previewHint: "AppearanceDialogs_previewHint",
-  previewDot: "AppearanceDialogs_previewDot",
-  plainDot: "AppearanceDialogs_plainDot",
-  faceRow: "AppearanceDialogs_faceRow",
+  panel: "AppearanceDialogs_panel",
+  head: "AppearanceDialogs_head",
+  headTitle: "AppearanceDialogs_headTitle",
+  headScope: "AppearanceDialogs_headScope",
+  toolbar: "AppearanceDialogs_toolbar",
   tabs: "AppearanceDialogs_tabs",
   tab: "AppearanceDialogs_tab",
   tabOn: "AppearanceDialogs_tabOn",
@@ -657,39 +654,109 @@ var AppearanceDialogs_default = {
   cell: "AppearanceDialogs_cell",
   cellOn: "AppearanceDialogs_cellOn",
   empty: "AppearanceDialogs_empty",
-  colorGrid: "AppearanceDialogs_colorGrid",
-  colorCell: "AppearanceDialogs_colorCell",
-  colorCellOn: "AppearanceDialogs_colorCellOn",
-  colorName: "AppearanceDialogs_colorName",
+  footer: "AppearanceDialogs_footer",
+  textButton: "AppearanceDialogs_textButton",
+  currentGlyph: "AppearanceDialogs_currentGlyph",
+  primaryButton: "AppearanceDialogs_primaryButton",
+  swatches: "AppearanceDialogs_swatches",
+  swatchButton: "AppearanceDialogs_swatchButton",
   swatch: "AppearanceDialogs_swatch",
-  check: "AppearanceDialogs_check",
-  clearCell: "AppearanceDialogs_clearCell",
-  clearCellOn: "AppearanceDialogs_clearCellOn"
+  swatchOn: "AppearanceDialogs_swatchOn",
+  clearRow: "AppearanceDialogs_clearRow",
+  clearRowOn: "AppearanceDialogs_clearRowOn",
+  plainDot: "AppearanceDialogs_plainDot"
 };
 
 // src/browser/rows/AppearanceDialogs.tsx
 var import_jsx_runtime2 = require("react/jsx-runtime");
+var ANCHOR_GAP = 6;
+var VIEWPORT_MARGIN = 8;
 function AppearanceDialogs(props) {
   const request = React.useSyncExternalStore(subscribeAppearanceRequest, getAppearanceRequest);
   if (request === null) return null;
   const close = () => {
     requestAppearance(null);
   };
-  return request.kind === "workspace-icon" ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(WorkspaceIconDialog, { request, close, ...props }, request.workspaceId) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(SessionColorDialog, { request, close, ...props }, request.sessionId);
+  return request.kind === "workspace-icon" ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(WorkspaceIconPicker, { request, close, ...props }, request.workspaceId) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(SessionColorPicker, { request, close, ...props }, request.sessionId);
 }
-function PickerModal({ title, close, t, footer, children }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(import_dsh_client_ui_primitives.Modal, { open: true, onClose: close, closeLabel: t("close"), title, footer, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: AppearanceDialogs_default.body, children }) });
+function PickerPopover({ request, title, close, children }) {
+  const panelRef = React.useRef(null);
+  const [position, setPosition] = React.useState(null);
+  const closeRef = React.useRef(close);
+  closeRef.current = close;
+  React.useLayoutEffect(() => {
+    const panel = panelRef.current;
+    if (panel === null) return;
+    const place = () => {
+      const width = panel.offsetWidth;
+      const height = panel.offsetHeight;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const anchor = request.anchor;
+      let left = anchor === void 0 ? viewportWidth / 2 - width / 2 : anchor.right + ANCHOR_GAP;
+      let top = anchor === void 0 ? viewportHeight / 3 : anchor.top;
+      if (left + width > viewportWidth - VIEWPORT_MARGIN) {
+        left = anchor === void 0 ? viewportWidth - width - VIEWPORT_MARGIN : anchor.left - ANCHOR_GAP - width;
+      }
+      left = Math.max(VIEWPORT_MARGIN, Math.min(left, viewportWidth - width - VIEWPORT_MARGIN));
+      top = Math.max(VIEWPORT_MARGIN, Math.min(top, viewportHeight - height - VIEWPORT_MARGIN));
+      setPosition({ left, top });
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(panel);
+    return () => {
+      observer.disconnect();
+    };
+  }, [request]);
+  React.useEffect(() => {
+    panelRef.current?.focus();
+    const onPointerDown = (event) => {
+      if (panelRef.current?.contains(event.target) === true) return;
+      closeRef.current();
+    };
+    const onKeyDown = (event) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      closeRef.current();
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("scroll", () => {
+      closeRef.current();
+    }, true);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown, true);
+    };
+  }, []);
+  return (0, import_react_dom.createPortal)(
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+      "div",
+      {
+        ref: panelRef,
+        role: "dialog",
+        "aria-label": title,
+        tabIndex: -1,
+        className: AppearanceDialogs_default.panel,
+        style: {
+          left: position?.left ?? 0,
+          top: position?.top ?? 0,
+          visibility: position === null ? "hidden" : "visible"
+        },
+        children
+      }
+    ),
+    document.body
+  );
 }
-function Preview({ title, hint, glyph }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: AppearanceDialogs_default.preview, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: AppearanceDialogs_default.previewGlyph, children: glyph }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { className: AppearanceDialogs_default.previewText, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: AppearanceDialogs_default.previewTitle, children: title }),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: AppearanceDialogs_default.previewHint, children: hint })
-    ] })
+function Head({ title, scope }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("header", { className: AppearanceDialogs_default.head, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: AppearanceDialogs_default.headTitle, children: title }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: AppearanceDialogs_default.headScope, title: scope, children: scope })
   ] });
 }
-function WorkspaceIconDialog({ request, close, t, workspaceIcons, onWorkspaceIcon }) {
+function WorkspaceIconPicker({ request, close, t, workspaceIcons, onWorkspaceIcon }) {
   const [face, setFace] = React.useState("emoji");
   const [query, setQuery] = React.useState("");
   const current2 = parseIconSpec(workspaceIcons[request.workspaceId]);
@@ -697,171 +764,144 @@ function WorkspaceIconDialog({ request, close, t, workspaceIcons, onWorkspaceIco
     onWorkspaceIcon(request.workspaceId, formatIconSpec(spec));
   };
   const matches = query.trim() === "" ? null : searchIcons(query);
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
-    PickerModal,
-    {
-      title: t("appearance.icon.title"),
-      close,
-      t,
-      footer: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(import_dsh_client_ui_primitives.Button, { variant: "outline", onClick: () => {
-          onWorkspaceIcon(request.workspaceId, null);
-        }, children: t("appearance.reset") }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(import_dsh_client_ui_primitives.Button, { variant: "primary", onClick: close, children: t("appearance.done") })
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(PickerPopover, { request, title: t("appearance.icon.title"), close, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Head, { title: t("appearance.icon.title"), scope: request.displayTitle }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: AppearanceDialogs_default.toolbar, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: AppearanceDialogs_default.tabs, role: "group", "aria-label": t("appearance.icon.title"), children: [
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", "aria-pressed": face === "emoji", className: clsx_default(AppearanceDialogs_default.tab, face === "emoji" && AppearanceDialogs_default.tabOn), onClick: () => {
+          setFace("emoji");
+        }, children: t("appearance.tab.emoji") }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", "aria-pressed": face === "icon", className: clsx_default(AppearanceDialogs_default.tab, face === "icon" && AppearanceDialogs_default.tabOn), onClick: () => {
+          setFace("icon");
+        }, children: t("appearance.tab.icon") })
       ] }),
-      children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-          Preview,
-          {
-            title: request.displayTitle,
-            hint: t("appearance.icon.hint"),
-            glyph: current2 === null ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(import_dsh_client_ui_primitives.IconFolderOpenRegular, { size: 20 }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(AppearanceIcon, { spec: current2, size: 24 })
+      face === "icon" && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+        "input",
+        {
+          className: AppearanceDialogs_default.search,
+          value: query,
+          placeholder: t("appearance.search"),
+          "aria-label": t("appearance.search"),
+          onChange: (event) => {
+            setQuery(event.target.value);
           }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: AppearanceDialogs_default.faceRow, role: "group", "aria-label": t("appearance.icon.title"), children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: AppearanceDialogs_default.tabs, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", "aria-pressed": face === "emoji", className: clsx_default(AppearanceDialogs_default.tab, face === "emoji" && AppearanceDialogs_default.tabOn), onClick: () => {
-              setFace("emoji");
-            }, children: t("appearance.tab.emoji") }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", "aria-pressed": face === "icon", className: clsx_default(AppearanceDialogs_default.tab, face === "icon" && AppearanceDialogs_default.tabOn), onClick: () => {
-              setFace("icon");
-            }, children: t("appearance.tab.icon") })
-          ] }),
-          face === "icon" && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-            "input",
-            {
-              className: AppearanceDialogs_default.search,
-              value: query,
-              placeholder: t("appearance.search"),
-              "aria-label": t("appearance.search"),
-              onChange: (e) => {
-                setQuery(e.target.value);
-              }
-            }
-          )
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: AppearanceDialogs_default.scroll, children: [
-          face === "emoji" && EMOJI_GROUPS.map((group) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h3", { className: AppearanceDialogs_default.groupLabel, children: t("appearance.group." + group.id) }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: AppearanceDialogs_default.grid, children: group.emojis.map((emoji) => {
-              const on = current2?.kind === "emoji" && current2.value === emoji;
-              return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-                "button",
-                {
-                  type: "button",
-                  className: clsx_default(AppearanceDialogs_default.cell, on && AppearanceDialogs_default.cellOn),
-                  "aria-pressed": on,
-                  "aria-label": emoji,
-                  onClick: () => {
-                    pick2({ kind: "emoji", value: emoji });
-                  },
-                  children: emoji
-                },
-                emoji
-              );
-            }) })
-          ] }, group.id)),
-          face === "icon" && matches !== null && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("section", { children: matches.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: AppearanceDialogs_default.empty, children: t("appearance.noMatches") }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: AppearanceDialogs_default.grid, children: matches.map((name2) => {
-            const on = current2?.kind === "icon" && current2.value === name2;
-            return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-              "button",
-              {
-                type: "button",
-                className: clsx_default(AppearanceDialogs_default.cell, on && AppearanceDialogs_default.cellOn),
-                "aria-pressed": on,
-                "aria-label": name2,
-                title: name2,
-                onClick: () => {
-                  pick2({ kind: "icon", value: name2 });
-                },
-                children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(AppearanceIcon, { spec: { kind: "icon", value: name2 }, size: 18 })
-              },
-              name2
-            );
-          }) }) }),
-          face === "icon" && matches === null && ICON_GROUPS.map((group) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h3", { className: AppearanceDialogs_default.groupLabel, children: t("appearance.group." + group.id) }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: AppearanceDialogs_default.grid, children: group.icons.map((name2) => {
-              const on = current2?.kind === "icon" && current2.value === name2;
-              return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-                "button",
-                {
-                  type: "button",
-                  className: clsx_default(AppearanceDialogs_default.cell, on && AppearanceDialogs_default.cellOn),
-                  "aria-pressed": on,
-                  "aria-label": name2,
-                  title: name2,
-                  onClick: () => {
-                    pick2({ kind: "icon", value: name2 });
-                  },
-                  children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(AppearanceIcon, { spec: { kind: "icon", value: name2 }, size: 18 })
-                },
-                name2
-              );
-            }) })
-          ] }, group.id))
-        ] })
-      ]
-    }
-  );
-}
-function SessionColorDialog({ request, close, t, sessionColors, onSessionColor }) {
-  const current2 = sessionColors[request.sessionId];
-  const hex = sessionColorHex(current2);
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
-    PickerModal,
-    {
-      title: t("appearance.color.title"),
-      close,
-      t,
-      footer: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(import_dsh_client_ui_primitives.Button, { variant: "primary", onClick: close, children: t("appearance.done") }),
-      children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-          Preview,
-          {
-            title: request.displayTitle,
-            hint: t("appearance.color.hint"),
-            glyph: hex === void 0 ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: AppearanceDialogs_default.plainDot, "aria-hidden": true }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: AppearanceDialogs_default.previewDot, style: { backgroundColor: hex }, "aria-hidden": true })
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: AppearanceDialogs_default.colorGrid, children: SESSION_COLORS.map((color) => {
-          const on = current2 === color.id;
-          const label = t("appearance.color." + color.id);
-          return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
+        }
+      )
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: AppearanceDialogs_default.scroll, children: [
+      face === "emoji" && EMOJI_GROUPS.map((group) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h3", { className: AppearanceDialogs_default.groupLabel, children: t("appearance.group." + group.id) }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: AppearanceDialogs_default.grid, children: group.emojis.map((emoji) => {
+          const on = current2?.kind === "emoji" && current2.value === emoji;
+          return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
             "button",
             {
               type: "button",
-              className: clsx_default(AppearanceDialogs_default.colorCell, on && AppearanceDialogs_default.colorCellOn),
+              className: clsx_default(AppearanceDialogs_default.cell, on && AppearanceDialogs_default.cellOn),
               "aria-pressed": on,
-              "aria-label": label,
-              title: label,
+              "aria-label": emoji,
               onClick: () => {
-                onSessionColor(request.sessionId, color.id);
+                pick2({ kind: "emoji", value: emoji });
               },
-              children: [
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: AppearanceDialogs_default.swatch, style: { backgroundColor: color.hex }, "aria-hidden": true }),
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: AppearanceDialogs_default.colorName, children: label }),
-                on && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: AppearanceDialogs_default.check, "aria-hidden": true, children: "✓" })
-              ]
+              children: emoji
             },
-            color.id
+            emoji
           );
-        }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+        }) })
+      ] }, group.id)),
+      face === "icon" && matches !== null && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("section", { children: matches.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: AppearanceDialogs_default.empty, children: t("appearance.noMatches") }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: AppearanceDialogs_default.grid, children: matches.map((name2) => {
+        const on = current2?.kind === "icon" && current2.value === name2;
+        return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
           "button",
           {
             type: "button",
-            className: clsx_default(AppearanceDialogs_default.clearCell, hex === void 0 && AppearanceDialogs_default.clearCellOn),
-            "aria-pressed": hex === void 0,
+            className: clsx_default(AppearanceDialogs_default.cell, on && AppearanceDialogs_default.cellOn),
+            "aria-pressed": on,
+            "aria-label": name2,
+            title: name2,
             onClick: () => {
-              onSessionColor(request.sessionId, null);
+              pick2({ kind: "icon", value: name2 });
             },
-            children: t("appearance.noColor")
-          }
-        )
-      ]
-    }
-  );
+            children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(AppearanceIcon, { spec: { kind: "icon", value: name2 }, size: 18 })
+          },
+          name2
+        );
+      }) }) }),
+      face === "icon" && matches === null && ICON_GROUPS.map((group) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h3", { className: AppearanceDialogs_default.groupLabel, children: t("appearance.group." + group.id) }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: AppearanceDialogs_default.grid, children: group.icons.map((name2) => {
+          const on = current2?.kind === "icon" && current2.value === name2;
+          return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+            "button",
+            {
+              type: "button",
+              className: clsx_default(AppearanceDialogs_default.cell, on && AppearanceDialogs_default.cellOn),
+              "aria-pressed": on,
+              "aria-label": name2,
+              title: name2,
+              onClick: () => {
+                pick2({ kind: "icon", value: name2 });
+              },
+              children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(AppearanceIcon, { spec: { kind: "icon", value: name2 }, size: 18 })
+            },
+            name2
+          );
+        }) })
+      ] }, group.id))
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("footer", { className: AppearanceDialogs_default.footer, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: AppearanceDialogs_default.textButton, onClick: () => {
+        onWorkspaceIcon(request.workspaceId, null);
+      }, children: t("appearance.reset") }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: AppearanceDialogs_default.currentGlyph, "aria-hidden": true, children: current2 === null ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(import_dsh_client_ui_primitives.IconFolderOpenRegular, { size: 14 }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(AppearanceIcon, { spec: current2, size: 14 }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: AppearanceDialogs_default.primaryButton, onClick: close, children: t("appearance.done") })
+    ] })
+  ] });
+}
+function SessionColorPicker({ request, close, t, sessionColors, onSessionColor }) {
+  const current2 = sessionColors[request.sessionId];
+  const hex = sessionColorHex(current2);
+  const choose = (color) => {
+    onSessionColor(request.sessionId, color);
+    close();
+  };
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(PickerPopover, { request, title: t("appearance.color.title"), close, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Head, { title: t("appearance.color.title"), scope: request.displayTitle }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: AppearanceDialogs_default.swatches, children: SESSION_COLORS.map((color) => {
+      const on = current2 === color.id;
+      const label = t("appearance.color." + color.id);
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+        "button",
+        {
+          type: "button",
+          className: clsx_default(AppearanceDialogs_default.swatchButton, on && AppearanceDialogs_default.swatchOn),
+          "aria-pressed": on,
+          "aria-label": label,
+          title: label,
+          onClick: () => {
+            choose(color.id);
+          },
+          children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: AppearanceDialogs_default.swatch, style: { backgroundColor: color.hex }, "aria-hidden": true })
+        },
+        color.id
+      );
+    }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
+      "button",
+      {
+        type: "button",
+        className: clsx_default(AppearanceDialogs_default.clearRow, hex === void 0 && AppearanceDialogs_default.clearRowOn),
+        "aria-pressed": hex === void 0,
+        onClick: () => {
+          choose(null);
+        },
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: AppearanceDialogs_default.plainDot, "aria-hidden": true }),
+          t("appearance.noColor")
+        ]
+      }
+    )
+  ] });
 }
 
 // src/browser/rows/WorkspaceDialogs.tsx
@@ -5831,6 +5871,12 @@ function translateFor(shipped) {
 function useCompositeT(shipped) {
   return React2.useMemo(() => translateFor(shipped), [shipped]);
 }
+function anchorFor(rowKey) {
+  const row = document.querySelector(`[data-row-key="${CSS.escape(rowKey)}"]`);
+  if (row === null) return void 0;
+  const rect = row.getBoundingClientRect();
+  return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+}
 function PaletteIcon() {
   return React2.createElement(AppearanceIcon, { spec: { kind: "icon", value: "palette" }, size: 16 });
 }
@@ -5841,7 +5887,7 @@ function SessionColorMenuItem(props) {
     icon: React2.createElement(PaletteIcon),
     onSelect: () => {
       setMenuOpen(false);
-      requestAppearance({ kind: "session-color", sessionId, displayTitle: displayTitle2 });
+      requestAppearance({ kind: "session-color", sessionId, displayTitle: displayTitle2, anchor: anchorFor("session:" + sessionId) });
     }
   }, t("appearance.sessionColor"));
 }
@@ -5964,7 +6010,7 @@ function apply(ctx) {
         label: t("appearance.workspaceIcon"),
         icon: { key: "workspace.appearance" },
         run: () => {
-          requestAppearance({ kind: "workspace-icon", workspaceId, displayTitle: displayTitle2 });
+          requestAppearance({ kind: "workspace-icon", workspaceId, displayTitle: displayTitle2, anchor: anchorFor("workspace:" + workspaceId) });
         }
       }]
     }), "dsh-sidebar-view: workspace icon menu action");
@@ -6026,7 +6072,7 @@ function apply(ctx) {
   if (existing) return
   var el = document.createElement('style')
   el.setAttribute('data-plugin', id)
-  el.textContent = "/* src/browser/rows/AppearanceDialogs.module.css */\n.AppearanceDialogs_body {\n  display: flex;\n  flex-direction: column;\n  gap: 10px;\n}\n.AppearanceDialogs_preview {\n  display: flex;\n  align-items: center;\n  gap: 10px;\n  min-width: 0;\n  padding: 8px 10px;\n  border-radius: var(--dsw-radius-md);\n  background: var(--dsw-alias-interactive-bg-hover);\n}\n.AppearanceDialogs_previewGlyph {\n  display: inline-flex;\n  flex: none;\n  align-items: center;\n  justify-content: center;\n  width: 36px;\n  height: 36px;\n  border-radius: var(--dsw-radius-sm);\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-primary);\n}\n.AppearanceDialogs_previewText {\n  display: flex;\n  flex-direction: column;\n  min-width: 0;\n}\n.AppearanceDialogs_previewTitle {\n  overflow: hidden;\n  color: var(--dsw-alias-label-primary);\n  font-size: 13px;\n  font-weight: 600;\n  line-height: 18px;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n.AppearanceDialogs_previewHint {\n  overflow: hidden;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n  line-height: 16px;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n.AppearanceDialogs_previewDot {\n  width: 16px;\n  height: 16px;\n  border-radius: 50%;\n}\n.AppearanceDialogs_plainDot {\n  width: 12px;\n  height: 12px;\n  border: 1.5px dashed var(--dsw-alias-label-tertiary);\n  border-radius: 50%;\n}\n.AppearanceDialogs_faceRow {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n}\n.AppearanceDialogs_tabs {\n  display: flex;\n  flex: none;\n  gap: 2px;\n  padding: 2px;\n  border-radius: var(--dsw-radius-md);\n  background: var(--dsw-alias-interactive-bg-hover);\n}\n.AppearanceDialogs_tab {\n  height: 24px;\n  padding: 0 10px;\n  border: 0;\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  font: inherit;\n  font-size: 12px;\n  line-height: 18px;\n  cursor: pointer;\n}\n.AppearanceDialogs_tabOn {\n  background: var(--dsw-alias-bg-layer-1);\n  box-shadow: var(--dsw-elevation-soft);\n  color: var(--dsw-alias-label-primary);\n}\n.AppearanceDialogs_search {\n  flex: 1;\n  min-width: 0;\n  height: 28px;\n  padding: 0 8px;\n  border: 0.5px solid var(--dsw-alias-border-l2);\n  border-radius: var(--dsw-radius-sm);\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-primary);\n  font: inherit;\n  font-size: 12px;\n}\n.AppearanceDialogs_scroll {\n  max-height: min(48vh, 360px);\n  overflow-y: auto;\n  overscroll-behavior: contain;\n}\n.AppearanceDialogs_groupLabel {\n  margin: 10px 0 4px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n  font-weight: 500;\n  line-height: 16px;\n}\n.AppearanceDialogs_groupLabel:first-child {\n  margin-top: 0;\n}\n.AppearanceDialogs_grid {\n  display: grid;\n  grid-template-columns: repeat(8, 1fr);\n  gap: 2px;\n}\n.AppearanceDialogs_cell {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  height: 32px;\n  min-width: 0;\n  padding: 0;\n  border: 0;\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 18px;\n  line-height: 1;\n  cursor: pointer;\n}\n.AppearanceDialogs_cellOn {\n  background: var(--dsw-alias-interactive-bg-hover);\n  box-shadow: inset 0 0 0 1px var(--dsw-alias-state-business-primary);\n  color: var(--dsw-alias-label-primary);\n}\n.AppearanceDialogs_empty {\n  padding: 20px 8px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 12px;\n  text-align: center;\n}\n.AppearanceDialogs_colorGrid {\n  display: grid;\n  grid-template-columns: repeat(3, 1fr);\n  gap: 6px;\n}\n.AppearanceDialogs_colorCell {\n  display: inline-flex;\n  align-items: center;\n  gap: 8px;\n  height: 38px;\n  min-width: 0;\n  padding: 0 10px;\n  border: 0.5px solid var(--dsw-alias-border-l2);\n  border-radius: var(--dsw-radius-md);\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-secondary);\n  font: inherit;\n  font-size: 12px;\n  cursor: pointer;\n}\n.AppearanceDialogs_colorCellOn {\n  border-color: transparent;\n  box-shadow: inset 0 0 0 1.5px var(--dsw-alias-label-primary);\n  color: var(--dsw-alias-label-primary);\n}\n.AppearanceDialogs_colorName {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n.AppearanceDialogs_swatch {\n  flex: none;\n  width: 14px;\n  height: 14px;\n  border-radius: 50%;\n}\n.AppearanceDialogs_check {\n  margin-inline-start: auto;\n  color: var(--dsw-alias-label-primary);\n  font-size: 12px;\n}\n.AppearanceDialogs_clearCell {\n  align-self: flex-start;\n  height: 28px;\n  padding: 0 10px;\n  border: 0.5px solid var(--dsw-alias-border-l2);\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  font: inherit;\n  font-size: 12px;\n  cursor: pointer;\n}\n.AppearanceDialogs_clearCellOn {\n  border-color: transparent;\n  box-shadow: inset 0 0 0 1.5px var(--dsw-alias-label-primary);\n  color: var(--dsw-alias-label-primary);\n}\n@media (hover: hover) {\n  .AppearanceDialogs_tab:hover,\n  .AppearanceDialogs_clearCell:hover {\n    color: var(--dsw-alias-label-primary);\n  }\n  .AppearanceDialogs_cell:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n    color: var(--dsw-alias-label-primary);\n  }\n  .AppearanceDialogs_colorCell:hover {\n    border-color: var(--dsw-alias-border-l3);\n    color: var(--dsw-alias-label-primary);\n  }\n}\n.AppearanceDialogs_tab:focus-visible,\n.AppearanceDialogs_cell:focus-visible,\n.AppearanceDialogs_colorCell:focus-visible,\n.AppearanceDialogs_clearCell:focus-visible,\n.AppearanceDialogs_search:focus-visible {\n  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));\n  outline-offset: -2px;\n}\n\n/* src/browser/rows/WorkspaceBrowser.module.css */\n.WorkspaceBrowser_root {\n  --workspace-toolbar-height: 36px;\n  --workspace-toolbar-gap: 0px;\n  position: relative;\n  flex: 1;\n  min-height: 0;\n  display: flex;\n  flex-direction: column;\n  box-sizing: border-box;\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) {\n  flex: none;\n  max-height: 100cqh;\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail):has(.WorkspaceBrowser_searchExpanded) {\n  height: 100cqh;\n}\n.WorkspaceBrowser_iconButton {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 28px;\n  height: 28px;\n  border: none;\n  border-radius: var(--dsw-radius-sm);\n  padding: 0;\n  background: transparent;\n  cursor: pointer;\n  color: var(--dsw-alias-label-secondary);\n}\n.WorkspaceBrowser_iconButton:focus-visible,\n.WorkspaceBrowser_searchButton:focus-visible,\n.WorkspaceBrowser_clearButton:focus-visible {\n  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));\n  outline-offset: -2px;\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_iconButton:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.WorkspaceBrowser_viewOptionsMenu {\n  min-width: 200px;\n}\n.WorkspaceBrowser_textScaleRow {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  min-height: 30px;\n  padding: 4px 8px;\n  font-size: 13px;\n  line-height: 20px;\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_textScaleLabel {\n  flex: none;\n}\n.WorkspaceBrowser_textScaleTrack {\n  display: flex;\n  flex: none;\n  gap: 2px;\n  margin-inline-start: auto;\n  padding: 2px;\n  border-radius: var(--dsw-radius-md);\n  background: var(--dsw-alias-interactive-bg-hover);\n}\n.WorkspaceBrowser_textScaleOption {\n  height: 22px;\n  padding: 0 8px;\n  border: 0;\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  font: inherit;\n  font-size: 12px;\n  line-height: 18px;\n  white-space: nowrap;\n  cursor: pointer;\n  transition: color 120ms ease;\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_textScaleOption:hover {\n    color: var(--dsw-alias-label-primary);\n  }\n}\n.WorkspaceBrowser_textScaleOptionOn {\n  background: var(--dsw-alias-bg-layer-1);\n  box-shadow: var(--dsw-elevation-soft);\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_textScaleOption:focus-visible {\n  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));\n  outline-offset: -2px;\n}\n.WorkspaceBrowser_sectionHeader {\n  flex: none;\n  display: flex;\n  align-items: center;\n  justify-content: flex-end;\n  gap: 4px;\n  height: var(--workspace-toolbar-height);\n  padding-left: var(--dsh-sidebar-row-padding);\n  margin-bottom: var(--workspace-toolbar-gap);\n  box-sizing: border-box;\n  border-radius: var(--dsw-radius-md);\n  overflow: hidden;\n  color: var(--dsw-alias-label-tertiary);\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_sectionHeader.WorkspaceBrowser_searchSpacingMotion {\n  transition:\n    margin-right 180ms var(--ds-ease-in-out),\n    padding-inline 180ms var(--ds-ease-in-out),\n    gap 180ms var(--ds-ease-in-out);\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_sectionHeader:not(:has(.WorkspaceBrowser_searchExpanded)) {\n  margin-right: -4px;\n  padding-right: 1px;\n}\n.WorkspaceBrowser_sectionLabel {\n  position: relative;\n  left: -1px;\n  flex: none;\n  max-width: 45%;\n  min-width: 0;\n  overflow: hidden;\n  white-space: nowrap;\n  line-height: 20px;\n  opacity: 1;\n  visibility: visible;\n  transition:\n    max-width 180ms var(--ds-ease-in-out),\n    margin-right 180ms var(--ds-ease-in-out),\n    opacity 120ms var(--ds-ease-in-out),\n    transform 180ms var(--ds-ease-in-out),\n    visibility 0s linear;\n}\n.WorkspaceBrowser_sectionLabelHidden {\n  max-width: 0;\n  margin-right: -4px;\n  opacity: 0;\n  transform: translateX(-4px);\n  visibility: hidden;\n  transition-delay:\n    0s,\n    0s,\n    0s,\n    0s,\n    180ms;\n}\n.WorkspaceBrowser_searchSlot {\n  flex: 1;\n  max-width: 28px;\n  min-width: 0;\n  display: flex;\n  align-items: center;\n  margin-left: auto;\n  padding-left: 0;\n  box-sizing: border-box;\n  transition: max-width 180ms var(--ds-ease-in-out), padding-left 180ms var(--ds-ease-in-out);\n}\n.WorkspaceBrowser_searchSlotExpanded {\n  max-width: 100%;\n  padding-left: 0;\n}\n.WorkspaceBrowser_headerActions {\n  flex: none;\n  display: flex;\n  align-items: center;\n  gap: 4px;\n  max-width: 60px;\n  opacity: 1;\n  overflow: hidden;\n  visibility: visible;\n  transition:\n    max-width 180ms var(--ds-ease-in-out),\n    opacity 120ms var(--ds-ease-in-out),\n    transform 180ms var(--ds-ease-in-out),\n    visibility 0s linear;\n}\n.WorkspaceBrowser_headerActionsHidden {\n  max-width: 0;\n  opacity: 0;\n  transform: translateX(4px);\n  visibility: hidden;\n  pointer-events: none;\n  transition-delay:\n    0s,\n    0s,\n    0s,\n    180ms;\n}\n.WorkspaceBrowser_search {\n  flex: none;\n  display: flex;\n  align-items: center;\n  gap: 0;\n  width: 100%;\n  height: 28px;\n  margin: 0;\n  padding: 0;\n  box-sizing: border-box;\n  border: none;\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  cursor: text;\n  color: var(--dsw-alias-label-secondary);\n  overflow: hidden;\n  transition:\n    width 180ms var(--ds-ease-in-out),\n    padding 180ms var(--ds-ease-in-out),\n    border-color 180ms var(--ds-ease-in-out),\n    background-color 180ms var(--ds-ease-in-out);\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_sectionHeader:has(.WorkspaceBrowser_searchExpanded) {\n  margin-right: 0;\n  padding-inline: calc(var(--dsh-sidebar-paint-inset) + 1px);\n  gap: 0;\n}\n.WorkspaceBrowser_sectionHeader:has(.WorkspaceBrowser_searchExpanded) .WorkspaceBrowser_sectionLabelHidden {\n  margin-right: 0;\n}\n.WorkspaceBrowser_searchExpanded {\n  width: 100%;\n  height: 32px;\n  margin-inline: 0;\n  padding: 0 4px 0 0;\n  border: 0.5px solid var(--dsw-alias-border-l4);\n  border-radius: var(--dsw-radius-md);\n  background: transparent;\n  color: var(--dsw-alias-label-caption);\n}\n.WorkspaceBrowser_searchButton {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 28px;\n  height: 28px;\n  border: none;\n  border-radius: var(--dsw-radius-sm);\n  padding: 0;\n  background: transparent;\n  cursor: pointer;\n  color: inherit;\n}\n.WorkspaceBrowser_searchExpanded .WorkspaceBrowser_searchButton {\n  width: 28px;\n  height: 32px;\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_searchButton:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n  .WorkspaceBrowser_searchExpanded .WorkspaceBrowser_searchButton:hover {\n    background: transparent;\n  }\n}\n.WorkspaceBrowser_searchInput {\n  flex: 1;\n  width: 0;\n  min-width: 0;\n  border: none;\n  outline: none;\n  background: transparent;\n  opacity: 0;\n  pointer-events: none;\n  font-size: 13px;\n  line-height: 18px;\n  color: var(--dsw-alias-label-primary);\n  transition: opacity 120ms var(--ds-ease-in-out);\n}\n.WorkspaceBrowser_searchExpanded .WorkspaceBrowser_searchInput {\n  margin-left: -2px;\n  opacity: 1;\n  pointer-events: auto;\n}\n.WorkspaceBrowser_searchInput::placeholder {\n  color: var(--dsw-alias-label-tertiary);\n}\n.WorkspaceBrowser_clearButton {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 24px;\n  height: 24px;\n  border: none;\n  border-radius: var(--dsw-radius-sm);\n  padding: 0;\n  background: transparent;\n  cursor: pointer;\n  color: var(--dsw-alias-label-secondary);\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_clearButton:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.WorkspaceBrowser_rail .WorkspaceBrowser_sectionHeader {\n  gap: 0;\n  padding-left: 0;\n  margin-bottom: 12px;\n  justify-content: flex-start;\n}\n.WorkspaceBrowser_rail .WorkspaceBrowser_headerActions {\n  max-width: none;\n}\n.WorkspaceBrowser_rail .WorkspaceBrowser_iconButton {\n  width: 36px;\n  height: 36px;\n  border-radius: var(--dsw-radius-md);\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_rail .WorkspaceBrowser_search {\n  width: 36px;\n  height: 36px;\n  padding: 0;\n  margin: 0 0 12px;\n  gap: 0;\n  border-radius: var(--dsw-radius-md);\n  border-color: transparent;\n  background: transparent;\n}\n.WorkspaceBrowser_rail .WorkspaceBrowser_searchButton {\n  width: 36px;\n  height: 36px;\n  border-radius: var(--dsw-radius-md);\n  color: var(--dsw-alias-label-primary);\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_rail .WorkspaceBrowser_searchButton:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.WorkspaceBrowser_statusTabs {\n  flex: none;\n  display: flex;\n  align-items: center;\n  gap: 2px;\n  height: 28px;\n  padding-inline: var(--dsh-sidebar-row-padding);\n  margin-bottom: 2px;\n  overflow-x: auto;\n  scrollbar-width: none;\n}\n.WorkspaceBrowser_statusTabs::-webkit-scrollbar {\n  display: none;\n}\n.WorkspaceBrowser_statusTab {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  gap: 4px;\n  height: 22px;\n  padding-inline: 8px;\n  border: none;\n  border-radius: var(--dsw-radius-md);\n  background: transparent;\n  color: var(--dsw-alias-label-tertiary);\n  font: inherit;\n  font-size: 12px;\n  line-height: 22px;\n  cursor: pointer;\n}\n.WorkspaceBrowser_statusTab:focus-visible {\n  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));\n  outline-offset: -1px;\n}\n.WorkspaceBrowser_statusTabActive,\n.WorkspaceBrowser_statusTabActive:focus-visible {\n  background: var(--dsw-alias-interactive-bg-hover);\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_statusTabCount {\n  font-variant-numeric: tabular-nums;\n  color: var(--dsw-alias-label-caption);\n}\n.WorkspaceBrowser_statusTabActive .WorkspaceBrowser_statusTabCount {\n  color: var(--dsw-alias-label-secondary);\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_statusTab:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.WorkspaceBrowser_listArea {\n  flex: 1;\n  min-height: 0;\n  display: flex;\n  flex-direction: column;\n  overflow: visible;\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_listArea {\n  display: block;\n  margin-left: -4px;\n  margin-right: calc(2px - var(--dsh-sidebar-inline-padding));\n  padding-left: 4px;\n  padding-right: calc(var(--dsh-sidebar-inline-padding) - var(--dsh-scrollbar-width) - 2px);\n  overflow-x: hidden;\n  overflow-y: auto;\n  scrollbar-gutter: stable;\n}\n@container scroll-state(scrollable: bottom) {\n  .WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_listArea {\n    overflow-y: hidden;\n  }\n}\n.WorkspaceBrowser_treeBody {\n  flex: 1;\n  min-height: 0;\n  display: flex;\n  flex-direction: column;\n  position: relative;\n}\n.WorkspaceBrowser_wide {\n  animation: WorkspaceBrowser_wide-in 200ms var(--ds-ease-in-out);\n}\n@keyframes WorkspaceBrowser_wide-in {\n  from {\n    opacity: 0;\n  }\n}\n.WorkspaceBrowser_list {\n  flex: 1;\n  min-height: 0;\n  overflow: visible;\n  padding-bottom: 16px;\n}\n.WorkspaceBrowser_flatList > * + *,\n.WorkspaceBrowser_searchTree > [role=treeitem] + [role=treeitem],\n.WorkspaceBrowser_groupSection > * + * {\n  margin-top: var(--dsh-sidebar-row-gap, 2px);\n}\n.WorkspaceBrowser_searchStatus {\n  padding: 10px 12px;\n  font-size: 12px;\n  line-height: 18px;\n  color: var(--dsw-alias-label-tertiary);\n}\n.WorkspaceBrowser_skeletonRow {\n  display: flex;\n  align-items: flex-start;\n  gap: var(--dsh-sidebar-label-gap);\n  box-sizing: border-box;\n  min-height: 48px;\n  padding: 6px var(--dsh-sidebar-row-padding) 7px;\n}\n.WorkspaceBrowser_skeletonDot {\n  flex: none;\n  width: 16px;\n  height: 16px;\n  border-radius: 50%;\n  corner-shape: round;\n}\n.WorkspaceBrowser_skeletonBars {\n  flex: 1;\n  min-width: 0;\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n}\n.WorkspaceBrowser_skeletonDot,\n.WorkspaceBrowser_skeletonBar {\n  background: var(--dsw-alias-bg-skeleton);\n  animation: WorkspaceBrowser_search-skeleton 2s cubic-bezier(0.36, 0, 0.64, 1) infinite;\n}\n.WorkspaceBrowser_skeletonBar {\n  width: 65%;\n  height: 16px;\n  border-radius: var(--dsw-radius-xs);\n}\n.WorkspaceBrowser_skeletonBarWide {\n  width: 90%;\n  height: 13px;\n}\n@keyframes WorkspaceBrowser_search-skeleton {\n  0% {\n    opacity: 1;\n  }\n  40% {\n    opacity: 0.6;\n  }\n  80%, 100% {\n    opacity: 1;\n  }\n}\n.WorkspaceBrowser_groupSection {\n  position: relative;\n}\n.WorkspaceBrowser_groupSection + .WorkspaceBrowser_groupSection {\n  margin-top: var(--dsh-sidebar-group-gap, 4px);\n}\n.WorkspaceBrowser_listTopDropIndicator,\n.WorkspaceBrowser_workspaceDropBefore::before,\n.WorkspaceBrowser_workspaceDropAfter::after {\n  content: \"\";\n  position: absolute;\n  z-index: 1;\n  left: 0;\n  right: 0;\n  height: 12px;\n  background:\n    linear-gradient(\n      55deg,\n      transparent calc(50% - 1px),\n      var(--dsw-alias-state-business-primary) calc(50% - 1px) calc(50% + 1px),\n      transparent calc(50% + 1px)) 0 0 / 5px 7px no-repeat,\n    linear-gradient(\n      125deg,\n      transparent calc(50% - 1px),\n      var(--dsw-alias-state-business-primary) calc(50% - 1px) calc(50% + 1px),\n      transparent calc(50% + 1px)) 0 5px / 5px 7px no-repeat,\n    linear-gradient(var(--dsw-alias-state-business-primary) 0 0) 4px 5px / calc(100% - 4px) 2px no-repeat;\n  pointer-events: none;\n}\n.WorkspaceBrowser_listTopDropIndicator {\n  top: -8px;\n}\n.WorkspaceBrowser_listTopDropActive > .WorkspaceBrowser_workspaceDropBefore:first-child::before {\n  display: none;\n}\n.WorkspaceBrowser_workspaceDropBefore::before {\n  top: -8px;\n}\n.WorkspaceBrowser_workspaceDropAfter::after {\n  bottom: -8px;\n}\n.WorkspaceBrowser_sessionOverflowButton {\n  width: 100%;\n  height: var(--dsh-sidebar-row-height, 28px);\n  border: none;\n  border-radius: var(--dsw-radius-sm);\n  padding: 0 var(--dsh-sidebar-row-padding) 0 calc(var(--dsh-sidebar-row-padding) + 16px + var(--dsh-sidebar-label-gap) + var(--dsh-workspace-indent, 0px));\n  background: transparent;\n  cursor: pointer;\n  text-align: left;\n  font-size: var(--dsh-sidebar-meta-size, 12px);\n  color: var(--dsw-alias-label-tertiary);\n}\n.WorkspaceBrowser_groupSection > .WorkspaceBrowser_sessionOverflowButton {\n  margin-top: 0;\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_sessionOverflowButton:hover {\n    background: transparent;\n    color: var(--dsw-alias-label-secondary);\n  }\n}\n.WorkspaceBrowser_empty {\n  padding: 16px 12px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 13px;\n}\n.WorkspaceBrowser_emptyState {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  gap: 8px;\n  margin-top: 80px;\n  padding: 0 12px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 13px;\n  line-height: 20px;\n}\n.WorkspaceBrowser_emptyState > svg {\n  margin-bottom: 4px;\n  color: var(--dsw-alias-label-caption);\n}\n.WorkspaceBrowser_emptyAction {\n  padding: 0;\n  border: none;\n  background: none;\n  cursor: pointer;\n  font-size: 13px;\n  line-height: 20px;\n  color: var(--dsw-alias-link);\n}\n.WorkspaceBrowser_renameInput {\n  box-sizing: border-box;\n  width: 100%;\n  height: 44px;\n  padding: 7px 14px;\n  border: 0.5px solid var(--dsw-alias-border-l4);\n  border-radius: var(--dsw-radius-lg);\n  outline: none;\n  background: transparent;\n  font-size: 14px;\n  font-weight: 400;\n  line-height: 22px;\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_renameInput:disabled {\n  color: var(--dsw-alias-label-dimmed);\n}\n.WorkspaceBrowser_renameError {\n  margin-top: 8px;\n  font-size: 12px;\n  line-height: 18px;\n  color: var(--dsw-alias-state-error-primary);\n}\n.WorkspaceBrowser_deleteAction:not(:disabled) {\n  color: var(--dsw-alias-state-error-primary);\n}\n.WorkspaceBrowser_deleteStatus {\n  font-size: 12px;\n  line-height: 18px;\n  color: var(--dsw-alias-label-secondary);\n}\n.WorkspaceBrowser_archiveActivity {\n  margin: 0 0 8px;\n  padding-left: 18px;\n  font-size: 13px;\n  line-height: 20px;\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_archiveActivity li {\n  overflow-wrap: anywhere;\n}\n@media (pointer: coarse) {\n  .WorkspaceBrowser_searchInput,\n  .WorkspaceBrowser_renameInput {\n    font-size: 16px;\n  }\n}\n@media (prefers-reduced-motion: reduce) {\n  .WorkspaceBrowser_wide {\n    animation: none;\n  }\n  .WorkspaceBrowser_skeletonDot,\n  .WorkspaceBrowser_skeletonBar {\n    animation: none;\n  }\n  .WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_sectionHeader.WorkspaceBrowser_searchSpacingMotion,\n  .WorkspaceBrowser_search,\n  .WorkspaceBrowser_sectionLabel,\n  .WorkspaceBrowser_searchSlot,\n  .WorkspaceBrowser_searchInput,\n  .WorkspaceBrowser_headerActions {\n    transition: none;\n  }\n}\n\n/* src/browser/rows/Rows.module.css */\n.Rows_projectRow,\n.Rows_sessionRow {\n  display: flex;\n  align-items: center;\n  gap: var(--dsh-sidebar-label-gap);\n  border-radius: var(--dsw-radius-md);\n  border-inline: var(--dsh-sidebar-paint-inset) solid transparent;\n  background-clip: padding-box;\n  box-sizing: border-box;\n  padding: 0 8px;\n  padding-inline-start: calc(var(--dsh-sidebar-row-padding) - var(--dsh-sidebar-paint-inset) + var(--dsh-workspace-indent, 0px));\n  cursor: pointer;\n  -webkit-user-select: none;\n  user-select: none;\n  color: var(--dsw-alias-label-primary);\n}\n@media (hover: hover) {\n  .Rows_projectRow:hover {\n    background-color: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.Rows_sessionRow.Rows_selected {\n  background-color: var(--dsw-alias-interactive-bg-hover);\n}\n.Rows_dragPreview {\n  background: var(--dsw-specific-sidebar-fill);\n}\n.Rows_searchResultRow {\n  display: flex;\n  flex-direction: column;\n  align-items: stretch;\n  width: 100%;\n  min-height: 48px;\n  box-sizing: border-box;\n  border: none;\n  border-radius: var(--dsw-radius-lg);\n  padding: 4px calc(var(--dsh-sidebar-row-padding) - var(--dsh-sidebar-paint-inset));\n  border-inline: var(--dsh-sidebar-paint-inset) solid transparent;\n  background: transparent;\n  background-clip: padding-box;\n  cursor: pointer;\n  text-align: left;\n  color: var(--dsw-alias-label-primary);\n}\n@media (hover: hover) {\n  .Rows_searchResultRow:hover {\n    background-color: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.Rows_searchResultRow.Rows_selected {\n  background-color: var(--dsw-alias-interactive-bg-hover);\n}\n.Rows_searchResultHeading {\n  display: flex;\n  align-items: center;\n  min-width: 0;\n}\n.Rows_searchResultTitle {\n  flex: 0 1 auto;\n  min-width: 0;\n  margin: 0 var(--dsh-sidebar-label-gap);\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: var(--dsh-sidebar-title-size, 14px);\n  line-height: var(--dsh-sidebar-title-line, 20px);\n}\n.Rows_searchResultMeta {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  min-width: 0;\n  margin-left: calc(16px + var(--dsh-sidebar-label-gap));\n}\n.Rows_searchResultWorkspace,\n.Rows_searchResultSnippet {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: var(--dsh-sidebar-meta-size, 12px);\n  line-height: 17px;\n}\n.Rows_searchResultWorkspace {\n  flex: none;\n  max-width: 40%;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_searchResultWorkspace:only-child {\n  max-width: 100%;\n}\n.Rows_searchResultSnippet {\n  flex: 1;\n  min-width: 0;\n  color: var(--dsw-alias-label-secondary);\n}\n.Rows_projectRow {\n  height: var(--dsh-sidebar-row-height, 28px);\n  align-items: center;\n  box-sizing: border-box;\n}\n.Rows_projectRow .Rows_rowActions {\n  height: 20px;\n}\n.Rows_sessionRow {\n  height: var(--dsh-sidebar-row-height, 28px);\n  gap: 0;\n}\n.Rows_sessionRow .Rows_title {\n  margin: 0 6px 0 var(--dsh-sidebar-label-gap);\n}\n.Rows_slot {\n  flex: none;\n  width: 16px;\n  height: 20px;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_visuallyHidden {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  overflow: hidden;\n  clip: rect(0 0 0 0);\n  white-space: nowrap;\n}\n.Rows_folderActive {\n  color: var(--dsw-alias-state-business-primary);\n}\n.Rows_folderCustom {\n  color: var(--dsw-alias-label-secondary);\n}\n.Rows_sessionColorDot {\n  flex: none;\n  width: 8px;\n  height: 8px;\n  border-radius: 50%;\n}\n.Rows_projectRow .Rows_chevron {\n  display: none;\n}\n@media (hover: hover) {\n  .Rows_projectRow:hover .Rows_chevron {\n    display: inline-flex;\n  }\n  .Rows_projectRow:hover .Rows_folder {\n    display: none;\n  }\n}\n.Rows_arrow {\n  transition: transform 150ms var(--ds-ease-in-out);\n}\n.Rows_arrowOpen {\n  transform: rotate(90deg);\n}\n.Rows_projectText {\n  flex: 1;\n  min-width: 0;\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n}\n.Rows_title {\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: var(--dsh-sidebar-title-size, 14px);\n  line-height: var(--dsh-sidebar-title-line, 20px);\n}\n.Rows_renameInput {\n  min-width: 0;\n  font-size: var(--dsh-sidebar-title-size, 14px);\n  line-height: var(--dsh-sidebar-title-line, 20px);\n  padding: 0 2px;\n  border: 0.5px solid var(--dsw-alias-border-l4);\n  border-radius: var(--dsw-radius-sm);\n  background: var(--dsw-alias-button-elevated-fill);\n  color: inherit;\n  outline: none;\n}\n.Rows_sessionRow .Rows_title {\n  flex: 1;\n}\n.Rows_sessionRow .Rows_title[data-scrolled] {\n  mask-image:\n    linear-gradient(\n      to right,\n      transparent,\n      #000 12px);\n}\n.Rows_sessionRow .Rows_title[data-clipped] {\n  mask-image:\n    linear-gradient(\n      to left,\n      transparent,\n      #000 12px);\n}\n.Rows_sessionRow .Rows_title[data-scrolled][data-clipped] {\n  mask-image:\n    linear-gradient(\n      to right,\n      transparent,\n      #000 12px,\n      #000 calc(100% - 12px),\n      transparent);\n}\n.Rows_meta {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: var(--dsh-sidebar-meta-size, 12px);\n  line-height: 16px;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_workspaceChip {\n  flex: none;\n  max-width: 72px;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: var(--dsh-sidebar-time-size, 10px);\n  line-height: 16px;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_time {\n  flex: none;\n  font-size: var(--dsh-sidebar-time-size, 10px);\n  line-height: 16px;\n  color: var(--dsw-alias-label-tertiary);\n  margin-inline-end: -1px;\n}\n.Rows_pinIndicator {\n  display: inline-flex;\n  flex: none;\n  width: 16px;\n  height: 20px;\n  align-items: center;\n  justify-content: center;\n  margin-left: 6px;\n  color: var(--dsw-alias-label-caption);\n}\n.Rows_sessionRow.Rows_archived .Rows_title,\n.Rows_searchResultRow.Rows_archived .Rows_searchResultTitle,\n.Rows_searchResultRow.Rows_archived .Rows_searchResultWorkspace,\n.Rows_searchResultRow.Rows_archived .Rows_searchResultSnippet {\n  color: var(--dsw-alias-label-caption);\n}\n.Rows_dot {\n  flex: none;\n}\n.Rows_rowActions {\n  flex: none;\n  display: none;\n  align-items: center;\n  gap: 13px;\n}\n@media (hover: hover) {\n  .Rows_projectRow:hover .Rows_rowActions,\n  .Rows_searchResultRow:hover .Rows_rowActions {\n    display: inline-flex;\n  }\n}\n.Rows_projectRow.Rows_menuOpen .Rows_rowActions {\n  display: inline-flex;\n}\n.Rows_rowQuickActions {\n  display: contents;\n}\n.Rows_searchResultHeading .Rows_rowActions {\n  margin-left: auto;\n}\n.Rows_rowResting {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  gap: 6px;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_rowResting .Rows_pinIndicator {\n  margin-left: 0;\n}\n@media (hover: hover) {\n  .Rows_sessionRow:hover {\n    background-color: var(--dsw-alias-interactive-bg-hover);\n  }\n  .Rows_sessionRow:hover .Rows_rowActions,\n  .Rows_sessionRow.Rows_menuOpen .Rows_rowActions,\n  html[data-input-modality=keyboard] .Rows_sessionRow:focus-within .Rows_rowActions {\n    display: inline-flex;\n  }\n  .Rows_sessionRow:hover .Rows_rowResting,\n  .Rows_sessionRow.Rows_menuOpen .Rows_rowResting,\n  html[data-input-modality=keyboard] .Rows_sessionRow:focus-within .Rows_rowResting {\n    display: none;\n  }\n  .Rows_sessionRow:hover .Rows_title,\n  .Rows_sessionRow.Rows_menuOpen .Rows_title {\n    text-overflow: clip;\n  }\n}\n@media (hover: none) {\n  .Rows_projectRow .Rows_rowActions,\n  .Rows_searchResultRow .Rows_rowActions,\n  .Rows_sessionRow .Rows_rowActions {\n    display: inline-flex;\n  }\n  .Rows_sessionRow .Rows_timestamp,\n  .Rows_sessionRow:has(.Rows_pinnedAction) .Rows_pinIndicator,\n  .Rows_sessionRow .Rows_rowQuickActions > [data-slot] > :not(.Rows_pinnedAction),\n  .Rows_projectRow[aria-expanded=false] .Rows_rowActions {\n    display: none;\n  }\n  .Rows_sessionRow .Rows_pinnedAction {\n    order: -1;\n  }\n}\n.Rows_projectRow.Rows_menuOpen,\n.Rows_sessionRow.Rows_menuOpen {\n  background-color: var(--dsw-alias-interactive-bg-hover);\n}\n.Rows_sessionRow.Rows_dropBefore,\n.Rows_sessionRow.Rows_dropAfter {\n  position: relative;\n}\n.Rows_sessionRow.Rows_dropBefore::before,\n.Rows_sessionRow.Rows_dropAfter::after {\n  content: \"\";\n  position: absolute;\n  z-index: 1;\n  left: calc(-1 * var(--dsh-sidebar-paint-inset));\n  right: calc(4px - var(--dsh-sidebar-paint-inset));\n  height: 12px;\n  background:\n    linear-gradient(\n      55deg,\n      transparent calc(50% - 1px),\n      var(--dsw-alias-state-business-primary) calc(50% - 1px) calc(50% + 1px),\n      transparent calc(50% + 1px)) 0 0 / 5px 7px no-repeat,\n    linear-gradient(\n      125deg,\n      transparent calc(50% - 1px),\n      var(--dsw-alias-state-business-primary) calc(50% - 1px) calc(50% + 1px),\n      transparent calc(50% + 1px)) 0 5px / 5px 7px no-repeat,\n    linear-gradient(var(--dsw-alias-state-business-primary) 0 0) 4px 5px / calc(100% - 4px) 2px no-repeat;\n  pointer-events: none;\n}\n.Rows_sessionRow.Rows_dropBefore::before {\n  top: -7px;\n}\n.Rows_sessionRow.Rows_dropAfter::after {\n  bottom: -7px;\n}\n.Rows_hoverContent {\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n}\n.Rows_hoverTitle {\n  font-size: 14px;\n  line-height: 20px;\n  color: var(--dsw-alias-hovercard-label-primary);\n  overflow-wrap: break-word;\n}\n.Rows_hoverPath {\n  font-size: 12px;\n  line-height: 16px;\n  color: var(--dsw-alias-hovercard-label-secondary);\n  word-break: break-all;\n}\n.Rows_hoverTime {\n  font-size: 12px;\n  line-height: 16px;\n  color: var(--dsw-alias-hovercard-label-secondary);\n}\n.Rows_hoverStatus {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  font-size: 12px;\n  line-height: 20px;\n  color: var(--dsw-alias-hovercard-label-tertiary);\n}\n.Rows_hoverArchived svg {\n  flex-shrink: 0;\n  margin: 0 -4px;\n}\n.Rows_iconButton {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 24px;\n  height: 24px;\n  margin: -4px;\n  border: none;\n  border-radius: var(--dsw-radius-xs);\n  padding: 0;\n  background: transparent;\n  cursor: pointer;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_iconButton:focus-visible {\n  outline-offset: -2px;\n}\n@media (hover: hover) {\n  .Rows_iconButton:hover {\n    color: var(--dsw-alias-label-primary);\n  }\n}\n.Rows_chevron {\n  color: var(--dsw-alias-label-caption);\n}\n.Rows_bucketRow .Rows_chevron {\n  display: inline-flex;\n}\n.Rows_bucketRow .Rows_title {\n  color: var(--dsw-alias-label-secondary);\n}\n@media (prefers-reduced-motion: reduce) {\n  .Rows_arrow {\n    animation: none;\n    transition: none;\n  }\n}\n\n/* src/browser/WorkspacePicker.module.css */\n.WorkspacePicker_modalAction {\n  min-width: 72px;\n}\n.WorkspacePicker_modalError,\n.WorkspacePicker_menuStatus {\n  margin-top: 8px;\n  font-size: 12px;\n  line-height: 18px;\n}\n.WorkspacePicker_modalError {\n  color: var(--dsw-alias-state-error-primary);\n}\n.WorkspacePicker_menuStatus,\n.WorkspacePicker_pathSuffix {\n  color: var(--dsw-alias-label-secondary);\n}\n.WorkspacePicker_disambiguated {\n  display: flex;\n  gap: 4px;\n  min-width: 0;\n}\n.WorkspacePicker_title,\n.WorkspacePicker_pathSuffix {\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.WorkspacePicker_pathSuffix {\n  flex: none;\n  max-width: 75%;\n}\n"
+  el.textContent = "/* src/browser/rows/AppearanceDialogs.module.css */\n.AppearanceDialogs_panel {\n  position: fixed;\n  z-index: 1200;\n  box-sizing: border-box;\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  width: 272px;\n  padding: 6px;\n  border-radius: var(--dsw-radius-md);\n  background: var(--dsw-menu-surface-fill, var(--dsw-alias-bg-layer-2));\n  backdrop-filter: var(--dsw-menu-backdrop-filter, blur(20px));\n  box-shadow: var(--dsw-elevation-prominent);\n  color: var(--dsw-alias-label-primary);\n  outline: none;\n}\n.AppearanceDialogs_head {\n  display: flex;\n  align-items: baseline;\n  gap: 6px;\n  min-width: 0;\n  padding: 2px 4px 0;\n}\n.AppearanceDialogs_headTitle {\n  flex: none;\n  color: var(--dsw-alias-label-primary);\n  font-size: 12px;\n  font-weight: 600;\n  line-height: 16px;\n}\n.AppearanceDialogs_headScope {\n  min-width: 0;\n  overflow: hidden;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n  line-height: 16px;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n.AppearanceDialogs_toolbar {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.AppearanceDialogs_tabs {\n  display: flex;\n  flex: none;\n  gap: 2px;\n  padding: 2px;\n  border-radius: var(--dsw-radius-sm);\n  background: var(--dsw-alias-interactive-bg-hover);\n}\n.AppearanceDialogs_tab {\n  height: 22px;\n  padding: 0 8px;\n  border: 0;\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  font: inherit;\n  font-size: 11px;\n  line-height: 16px;\n  cursor: pointer;\n}\n.AppearanceDialogs_tabOn {\n  background: var(--dsw-alias-bg-layer-1);\n  box-shadow: var(--dsw-elevation-soft);\n  color: var(--dsw-alias-label-primary);\n}\n.AppearanceDialogs_search {\n  flex: 1;\n  min-width: 0;\n  height: 24px;\n  padding: 0 6px;\n  border: 0.5px solid var(--dsw-alias-border-l2);\n  border-radius: var(--dsw-radius-sm);\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-primary);\n  font: inherit;\n  font-size: 11px;\n}\n.AppearanceDialogs_scroll {\n  max-height: 224px;\n  margin: 0 -4px;\n  padding: 0 4px;\n  overflow-y: auto;\n  overscroll-behavior: contain;\n}\n.AppearanceDialogs_groupLabel {\n  margin: 6px 2px 3px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 10px;\n  font-weight: 500;\n  line-height: 14px;\n}\n.AppearanceDialogs_groupLabel:first-child {\n  margin-top: 0;\n}\n.AppearanceDialogs_grid {\n  display: grid;\n  grid-template-columns: repeat(7, 1fr);\n  gap: 2px;\n}\n.AppearanceDialogs_cell {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  height: 30px;\n  min-width: 0;\n  padding: 0;\n  border: 0;\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 16px;\n  line-height: 1;\n  cursor: pointer;\n}\n.AppearanceDialogs_cellOn {\n  background: var(--dsw-alias-interactive-bg-hover);\n  box-shadow: inset 0 0 0 1px var(--dsw-alias-state-business-primary);\n  color: var(--dsw-alias-label-primary);\n}\n.AppearanceDialogs_empty {\n  padding: 16px 8px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n  text-align: center;\n}\n.AppearanceDialogs_footer {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  padding-top: 6px;\n  border-top: 0.5px solid var(--dsw-alias-border-l1);\n}\n.AppearanceDialogs_textButton {\n  height: 24px;\n  padding: 0 6px;\n  border: 0;\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  font: inherit;\n  font-size: 11px;\n  cursor: pointer;\n}\n.AppearanceDialogs_currentGlyph {\n  display: inline-flex;\n  align-items: center;\n  margin-inline-start: auto;\n  color: var(--dsw-alias-label-tertiary);\n}\n.AppearanceDialogs_primaryButton {\n  height: 24px;\n  padding: 0 12px;\n  border: 0;\n  border-radius: var(--dsw-radius-sm);\n  background: var(--dsw-alias-label-primary);\n  color: var(--dsw-alias-bg-base);\n  font: inherit;\n  font-size: 11px;\n  font-weight: 600;\n  cursor: pointer;\n}\n.AppearanceDialogs_swatches {\n  display: grid;\n  grid-template-columns: repeat(5, 1fr);\n  gap: 6px;\n  padding: 2px 0;\n}\n.AppearanceDialogs_swatchButton {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  height: 34px;\n  border: 0;\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  cursor: pointer;\n}\n.AppearanceDialogs_swatch {\n  width: 20px;\n  height: 20px;\n  border-radius: 50%;\n}\n.AppearanceDialogs_swatchOn {\n  background: var(--dsw-alias-interactive-bg-hover);\n  box-shadow: inset 0 0 0 1.5px var(--dsw-alias-label-primary);\n}\n.AppearanceDialogs_clearRow {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  height: 30px;\n  padding: 0 8px;\n  border: 0.5px solid var(--dsw-alias-border-l2);\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  font: inherit;\n  font-size: 11px;\n  cursor: pointer;\n}\n.AppearanceDialogs_clearRowOn {\n  border-color: transparent;\n  box-shadow: inset 0 0 0 1.5px var(--dsw-alias-label-primary);\n  color: var(--dsw-alias-label-primary);\n}\n.AppearanceDialogs_plainDot {\n  width: 12px;\n  height: 12px;\n  border: 1.5px dashed var(--dsw-alias-label-tertiary);\n  border-radius: 50%;\n}\n@media (hover: hover) {\n  .AppearanceDialogs_tab:hover,\n  .AppearanceDialogs_textButton:hover,\n  .AppearanceDialogs_clearRow:hover {\n    color: var(--dsw-alias-label-primary);\n  }\n  .AppearanceDialogs_cell:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n    color: var(--dsw-alias-label-primary);\n  }\n  .AppearanceDialogs_swatchButton:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.AppearanceDialogs_tab:focus-visible,\n.AppearanceDialogs_cell:focus-visible,\n.AppearanceDialogs_swatchButton:focus-visible,\n.AppearanceDialogs_clearRow:focus-visible,\n.AppearanceDialogs_textButton:focus-visible,\n.AppearanceDialogs_primaryButton:focus-visible,\n.AppearanceDialogs_search:focus-visible {\n  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));\n  outline-offset: -2px;\n}\n\n/* src/browser/rows/WorkspaceBrowser.module.css */\n.WorkspaceBrowser_root {\n  --workspace-toolbar-height: 36px;\n  --workspace-toolbar-gap: 0px;\n  position: relative;\n  flex: 1;\n  min-height: 0;\n  display: flex;\n  flex-direction: column;\n  box-sizing: border-box;\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) {\n  flex: none;\n  max-height: 100cqh;\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail):has(.WorkspaceBrowser_searchExpanded) {\n  height: 100cqh;\n}\n.WorkspaceBrowser_iconButton {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 28px;\n  height: 28px;\n  border: none;\n  border-radius: var(--dsw-radius-sm);\n  padding: 0;\n  background: transparent;\n  cursor: pointer;\n  color: var(--dsw-alias-label-secondary);\n}\n.WorkspaceBrowser_iconButton:focus-visible,\n.WorkspaceBrowser_searchButton:focus-visible,\n.WorkspaceBrowser_clearButton:focus-visible {\n  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));\n  outline-offset: -2px;\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_iconButton:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.WorkspaceBrowser_viewOptionsMenu {\n  min-width: 200px;\n}\n.WorkspaceBrowser_textScaleRow {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  min-height: 30px;\n  padding: 4px 8px;\n  font-size: 13px;\n  line-height: 20px;\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_textScaleLabel {\n  flex: none;\n}\n.WorkspaceBrowser_textScaleTrack {\n  display: flex;\n  flex: none;\n  gap: 2px;\n  margin-inline-start: auto;\n  padding: 2px;\n  border-radius: var(--dsw-radius-md);\n  background: var(--dsw-alias-interactive-bg-hover);\n}\n.WorkspaceBrowser_textScaleOption {\n  height: 22px;\n  padding: 0 8px;\n  border: 0;\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  font: inherit;\n  font-size: 12px;\n  line-height: 18px;\n  white-space: nowrap;\n  cursor: pointer;\n  transition: color 120ms ease;\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_textScaleOption:hover {\n    color: var(--dsw-alias-label-primary);\n  }\n}\n.WorkspaceBrowser_textScaleOptionOn {\n  background: var(--dsw-alias-bg-layer-1);\n  box-shadow: var(--dsw-elevation-soft);\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_textScaleOption:focus-visible {\n  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));\n  outline-offset: -2px;\n}\n.WorkspaceBrowser_sectionHeader {\n  flex: none;\n  display: flex;\n  align-items: center;\n  justify-content: flex-end;\n  gap: 4px;\n  height: var(--workspace-toolbar-height);\n  padding-left: var(--dsh-sidebar-row-padding);\n  margin-bottom: var(--workspace-toolbar-gap);\n  box-sizing: border-box;\n  border-radius: var(--dsw-radius-md);\n  overflow: hidden;\n  color: var(--dsw-alias-label-tertiary);\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_sectionHeader.WorkspaceBrowser_searchSpacingMotion {\n  transition:\n    margin-right 180ms var(--ds-ease-in-out),\n    padding-inline 180ms var(--ds-ease-in-out),\n    gap 180ms var(--ds-ease-in-out);\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_sectionHeader:not(:has(.WorkspaceBrowser_searchExpanded)) {\n  margin-right: -4px;\n  padding-right: 1px;\n}\n.WorkspaceBrowser_sectionLabel {\n  position: relative;\n  left: -1px;\n  flex: none;\n  max-width: 45%;\n  min-width: 0;\n  overflow: hidden;\n  white-space: nowrap;\n  line-height: 20px;\n  opacity: 1;\n  visibility: visible;\n  transition:\n    max-width 180ms var(--ds-ease-in-out),\n    margin-right 180ms var(--ds-ease-in-out),\n    opacity 120ms var(--ds-ease-in-out),\n    transform 180ms var(--ds-ease-in-out),\n    visibility 0s linear;\n}\n.WorkspaceBrowser_sectionLabelHidden {\n  max-width: 0;\n  margin-right: -4px;\n  opacity: 0;\n  transform: translateX(-4px);\n  visibility: hidden;\n  transition-delay:\n    0s,\n    0s,\n    0s,\n    0s,\n    180ms;\n}\n.WorkspaceBrowser_searchSlot {\n  flex: 1;\n  max-width: 28px;\n  min-width: 0;\n  display: flex;\n  align-items: center;\n  margin-left: auto;\n  padding-left: 0;\n  box-sizing: border-box;\n  transition: max-width 180ms var(--ds-ease-in-out), padding-left 180ms var(--ds-ease-in-out);\n}\n.WorkspaceBrowser_searchSlotExpanded {\n  max-width: 100%;\n  padding-left: 0;\n}\n.WorkspaceBrowser_headerActions {\n  flex: none;\n  display: flex;\n  align-items: center;\n  gap: 4px;\n  max-width: 60px;\n  opacity: 1;\n  overflow: hidden;\n  visibility: visible;\n  transition:\n    max-width 180ms var(--ds-ease-in-out),\n    opacity 120ms var(--ds-ease-in-out),\n    transform 180ms var(--ds-ease-in-out),\n    visibility 0s linear;\n}\n.WorkspaceBrowser_headerActionsHidden {\n  max-width: 0;\n  opacity: 0;\n  transform: translateX(4px);\n  visibility: hidden;\n  pointer-events: none;\n  transition-delay:\n    0s,\n    0s,\n    0s,\n    180ms;\n}\n.WorkspaceBrowser_search {\n  flex: none;\n  display: flex;\n  align-items: center;\n  gap: 0;\n  width: 100%;\n  height: 28px;\n  margin: 0;\n  padding: 0;\n  box-sizing: border-box;\n  border: none;\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  cursor: text;\n  color: var(--dsw-alias-label-secondary);\n  overflow: hidden;\n  transition:\n    width 180ms var(--ds-ease-in-out),\n    padding 180ms var(--ds-ease-in-out),\n    border-color 180ms var(--ds-ease-in-out),\n    background-color 180ms var(--ds-ease-in-out);\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_sectionHeader:has(.WorkspaceBrowser_searchExpanded) {\n  margin-right: 0;\n  padding-inline: calc(var(--dsh-sidebar-paint-inset) + 1px);\n  gap: 0;\n}\n.WorkspaceBrowser_sectionHeader:has(.WorkspaceBrowser_searchExpanded) .WorkspaceBrowser_sectionLabelHidden {\n  margin-right: 0;\n}\n.WorkspaceBrowser_searchExpanded {\n  width: 100%;\n  height: 32px;\n  margin-inline: 0;\n  padding: 0 4px 0 0;\n  border: 0.5px solid var(--dsw-alias-border-l4);\n  border-radius: var(--dsw-radius-md);\n  background: transparent;\n  color: var(--dsw-alias-label-caption);\n}\n.WorkspaceBrowser_searchButton {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 28px;\n  height: 28px;\n  border: none;\n  border-radius: var(--dsw-radius-sm);\n  padding: 0;\n  background: transparent;\n  cursor: pointer;\n  color: inherit;\n}\n.WorkspaceBrowser_searchExpanded .WorkspaceBrowser_searchButton {\n  width: 28px;\n  height: 32px;\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_searchButton:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n  .WorkspaceBrowser_searchExpanded .WorkspaceBrowser_searchButton:hover {\n    background: transparent;\n  }\n}\n.WorkspaceBrowser_searchInput {\n  flex: 1;\n  width: 0;\n  min-width: 0;\n  border: none;\n  outline: none;\n  background: transparent;\n  opacity: 0;\n  pointer-events: none;\n  font-size: 13px;\n  line-height: 18px;\n  color: var(--dsw-alias-label-primary);\n  transition: opacity 120ms var(--ds-ease-in-out);\n}\n.WorkspaceBrowser_searchExpanded .WorkspaceBrowser_searchInput {\n  margin-left: -2px;\n  opacity: 1;\n  pointer-events: auto;\n}\n.WorkspaceBrowser_searchInput::placeholder {\n  color: var(--dsw-alias-label-tertiary);\n}\n.WorkspaceBrowser_clearButton {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 24px;\n  height: 24px;\n  border: none;\n  border-radius: var(--dsw-radius-sm);\n  padding: 0;\n  background: transparent;\n  cursor: pointer;\n  color: var(--dsw-alias-label-secondary);\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_clearButton:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.WorkspaceBrowser_rail .WorkspaceBrowser_sectionHeader {\n  gap: 0;\n  padding-left: 0;\n  margin-bottom: 12px;\n  justify-content: flex-start;\n}\n.WorkspaceBrowser_rail .WorkspaceBrowser_headerActions {\n  max-width: none;\n}\n.WorkspaceBrowser_rail .WorkspaceBrowser_iconButton {\n  width: 36px;\n  height: 36px;\n  border-radius: var(--dsw-radius-md);\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_rail .WorkspaceBrowser_search {\n  width: 36px;\n  height: 36px;\n  padding: 0;\n  margin: 0 0 12px;\n  gap: 0;\n  border-radius: var(--dsw-radius-md);\n  border-color: transparent;\n  background: transparent;\n}\n.WorkspaceBrowser_rail .WorkspaceBrowser_searchButton {\n  width: 36px;\n  height: 36px;\n  border-radius: var(--dsw-radius-md);\n  color: var(--dsw-alias-label-primary);\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_rail .WorkspaceBrowser_searchButton:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.WorkspaceBrowser_statusTabs {\n  flex: none;\n  display: flex;\n  align-items: center;\n  gap: 2px;\n  height: 28px;\n  padding-inline: var(--dsh-sidebar-row-padding);\n  margin-bottom: 2px;\n  overflow-x: auto;\n  scrollbar-width: none;\n}\n.WorkspaceBrowser_statusTabs::-webkit-scrollbar {\n  display: none;\n}\n.WorkspaceBrowser_statusTab {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  gap: 4px;\n  height: 22px;\n  padding-inline: 8px;\n  border: none;\n  border-radius: var(--dsw-radius-md);\n  background: transparent;\n  color: var(--dsw-alias-label-tertiary);\n  font: inherit;\n  font-size: 12px;\n  line-height: 22px;\n  cursor: pointer;\n}\n.WorkspaceBrowser_statusTab:focus-visible {\n  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));\n  outline-offset: -1px;\n}\n.WorkspaceBrowser_statusTabActive,\n.WorkspaceBrowser_statusTabActive:focus-visible {\n  background: var(--dsw-alias-interactive-bg-hover);\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_statusTabCount {\n  font-variant-numeric: tabular-nums;\n  color: var(--dsw-alias-label-caption);\n}\n.WorkspaceBrowser_statusTabActive .WorkspaceBrowser_statusTabCount {\n  color: var(--dsw-alias-label-secondary);\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_statusTab:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.WorkspaceBrowser_listArea {\n  flex: 1;\n  min-height: 0;\n  display: flex;\n  flex-direction: column;\n  overflow: visible;\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_listArea {\n  display: block;\n  margin-left: -4px;\n  margin-right: calc(2px - var(--dsh-sidebar-inline-padding));\n  padding-left: 4px;\n  padding-right: calc(var(--dsh-sidebar-inline-padding) - var(--dsh-scrollbar-width) - 2px);\n  overflow-x: hidden;\n  overflow-y: auto;\n  scrollbar-gutter: stable;\n}\n@container scroll-state(scrollable: bottom) {\n  .WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_listArea {\n    overflow-y: hidden;\n  }\n}\n.WorkspaceBrowser_treeBody {\n  flex: 1;\n  min-height: 0;\n  display: flex;\n  flex-direction: column;\n  position: relative;\n}\n.WorkspaceBrowser_wide {\n  animation: WorkspaceBrowser_wide-in 200ms var(--ds-ease-in-out);\n}\n@keyframes WorkspaceBrowser_wide-in {\n  from {\n    opacity: 0;\n  }\n}\n.WorkspaceBrowser_list {\n  flex: 1;\n  min-height: 0;\n  overflow: visible;\n  padding-bottom: 16px;\n}\n.WorkspaceBrowser_flatList > * + *,\n.WorkspaceBrowser_searchTree > [role=treeitem] + [role=treeitem],\n.WorkspaceBrowser_groupSection > * + * {\n  margin-top: var(--dsh-sidebar-row-gap, 2px);\n}\n.WorkspaceBrowser_searchStatus {\n  padding: 10px 12px;\n  font-size: 12px;\n  line-height: 18px;\n  color: var(--dsw-alias-label-tertiary);\n}\n.WorkspaceBrowser_skeletonRow {\n  display: flex;\n  align-items: flex-start;\n  gap: var(--dsh-sidebar-label-gap);\n  box-sizing: border-box;\n  min-height: 48px;\n  padding: 6px var(--dsh-sidebar-row-padding) 7px;\n}\n.WorkspaceBrowser_skeletonDot {\n  flex: none;\n  width: 16px;\n  height: 16px;\n  border-radius: 50%;\n  corner-shape: round;\n}\n.WorkspaceBrowser_skeletonBars {\n  flex: 1;\n  min-width: 0;\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n}\n.WorkspaceBrowser_skeletonDot,\n.WorkspaceBrowser_skeletonBar {\n  background: var(--dsw-alias-bg-skeleton);\n  animation: WorkspaceBrowser_search-skeleton 2s cubic-bezier(0.36, 0, 0.64, 1) infinite;\n}\n.WorkspaceBrowser_skeletonBar {\n  width: 65%;\n  height: 16px;\n  border-radius: var(--dsw-radius-xs);\n}\n.WorkspaceBrowser_skeletonBarWide {\n  width: 90%;\n  height: 13px;\n}\n@keyframes WorkspaceBrowser_search-skeleton {\n  0% {\n    opacity: 1;\n  }\n  40% {\n    opacity: 0.6;\n  }\n  80%, 100% {\n    opacity: 1;\n  }\n}\n.WorkspaceBrowser_groupSection {\n  position: relative;\n}\n.WorkspaceBrowser_groupSection + .WorkspaceBrowser_groupSection {\n  margin-top: var(--dsh-sidebar-group-gap, 4px);\n}\n.WorkspaceBrowser_listTopDropIndicator,\n.WorkspaceBrowser_workspaceDropBefore::before,\n.WorkspaceBrowser_workspaceDropAfter::after {\n  content: \"\";\n  position: absolute;\n  z-index: 1;\n  left: 0;\n  right: 0;\n  height: 12px;\n  background:\n    linear-gradient(\n      55deg,\n      transparent calc(50% - 1px),\n      var(--dsw-alias-state-business-primary) calc(50% - 1px) calc(50% + 1px),\n      transparent calc(50% + 1px)) 0 0 / 5px 7px no-repeat,\n    linear-gradient(\n      125deg,\n      transparent calc(50% - 1px),\n      var(--dsw-alias-state-business-primary) calc(50% - 1px) calc(50% + 1px),\n      transparent calc(50% + 1px)) 0 5px / 5px 7px no-repeat,\n    linear-gradient(var(--dsw-alias-state-business-primary) 0 0) 4px 5px / calc(100% - 4px) 2px no-repeat;\n  pointer-events: none;\n}\n.WorkspaceBrowser_listTopDropIndicator {\n  top: -8px;\n}\n.WorkspaceBrowser_listTopDropActive > .WorkspaceBrowser_workspaceDropBefore:first-child::before {\n  display: none;\n}\n.WorkspaceBrowser_workspaceDropBefore::before {\n  top: -8px;\n}\n.WorkspaceBrowser_workspaceDropAfter::after {\n  bottom: -8px;\n}\n.WorkspaceBrowser_sessionOverflowButton {\n  width: 100%;\n  height: var(--dsh-sidebar-row-height, 28px);\n  border: none;\n  border-radius: var(--dsw-radius-sm);\n  padding: 0 var(--dsh-sidebar-row-padding) 0 calc(var(--dsh-sidebar-row-padding) + 16px + var(--dsh-sidebar-label-gap) + var(--dsh-workspace-indent, 0px));\n  background: transparent;\n  cursor: pointer;\n  text-align: left;\n  font-size: var(--dsh-sidebar-meta-size, 12px);\n  color: var(--dsw-alias-label-tertiary);\n}\n.WorkspaceBrowser_groupSection > .WorkspaceBrowser_sessionOverflowButton {\n  margin-top: 0;\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_sessionOverflowButton:hover {\n    background: transparent;\n    color: var(--dsw-alias-label-secondary);\n  }\n}\n.WorkspaceBrowser_empty {\n  padding: 16px 12px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 13px;\n}\n.WorkspaceBrowser_emptyState {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  gap: 8px;\n  margin-top: 80px;\n  padding: 0 12px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 13px;\n  line-height: 20px;\n}\n.WorkspaceBrowser_emptyState > svg {\n  margin-bottom: 4px;\n  color: var(--dsw-alias-label-caption);\n}\n.WorkspaceBrowser_emptyAction {\n  padding: 0;\n  border: none;\n  background: none;\n  cursor: pointer;\n  font-size: 13px;\n  line-height: 20px;\n  color: var(--dsw-alias-link);\n}\n.WorkspaceBrowser_renameInput {\n  box-sizing: border-box;\n  width: 100%;\n  height: 44px;\n  padding: 7px 14px;\n  border: 0.5px solid var(--dsw-alias-border-l4);\n  border-radius: var(--dsw-radius-lg);\n  outline: none;\n  background: transparent;\n  font-size: 14px;\n  font-weight: 400;\n  line-height: 22px;\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_renameInput:disabled {\n  color: var(--dsw-alias-label-dimmed);\n}\n.WorkspaceBrowser_renameError {\n  margin-top: 8px;\n  font-size: 12px;\n  line-height: 18px;\n  color: var(--dsw-alias-state-error-primary);\n}\n.WorkspaceBrowser_deleteAction:not(:disabled) {\n  color: var(--dsw-alias-state-error-primary);\n}\n.WorkspaceBrowser_deleteStatus {\n  font-size: 12px;\n  line-height: 18px;\n  color: var(--dsw-alias-label-secondary);\n}\n.WorkspaceBrowser_archiveActivity {\n  margin: 0 0 8px;\n  padding-left: 18px;\n  font-size: 13px;\n  line-height: 20px;\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_archiveActivity li {\n  overflow-wrap: anywhere;\n}\n@media (pointer: coarse) {\n  .WorkspaceBrowser_searchInput,\n  .WorkspaceBrowser_renameInput {\n    font-size: 16px;\n  }\n}\n@media (prefers-reduced-motion: reduce) {\n  .WorkspaceBrowser_wide {\n    animation: none;\n  }\n  .WorkspaceBrowser_skeletonDot,\n  .WorkspaceBrowser_skeletonBar {\n    animation: none;\n  }\n  .WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_sectionHeader.WorkspaceBrowser_searchSpacingMotion,\n  .WorkspaceBrowser_search,\n  .WorkspaceBrowser_sectionLabel,\n  .WorkspaceBrowser_searchSlot,\n  .WorkspaceBrowser_searchInput,\n  .WorkspaceBrowser_headerActions {\n    transition: none;\n  }\n}\n\n/* src/browser/rows/Rows.module.css */\n.Rows_projectRow,\n.Rows_sessionRow {\n  display: flex;\n  align-items: center;\n  gap: var(--dsh-sidebar-label-gap);\n  border-radius: var(--dsw-radius-md);\n  border-inline: var(--dsh-sidebar-paint-inset) solid transparent;\n  background-clip: padding-box;\n  box-sizing: border-box;\n  padding: 0 8px;\n  padding-inline-start: calc(var(--dsh-sidebar-row-padding) - var(--dsh-sidebar-paint-inset) + var(--dsh-workspace-indent, 0px));\n  cursor: pointer;\n  -webkit-user-select: none;\n  user-select: none;\n  color: var(--dsw-alias-label-primary);\n}\n@media (hover: hover) {\n  .Rows_projectRow:hover {\n    background-color: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.Rows_sessionRow.Rows_selected {\n  background-color: var(--dsw-alias-interactive-bg-hover);\n}\n.Rows_dragPreview {\n  background: var(--dsw-specific-sidebar-fill);\n}\n.Rows_searchResultRow {\n  display: flex;\n  flex-direction: column;\n  align-items: stretch;\n  width: 100%;\n  min-height: 48px;\n  box-sizing: border-box;\n  border: none;\n  border-radius: var(--dsw-radius-lg);\n  padding: 4px calc(var(--dsh-sidebar-row-padding) - var(--dsh-sidebar-paint-inset));\n  border-inline: var(--dsh-sidebar-paint-inset) solid transparent;\n  background: transparent;\n  background-clip: padding-box;\n  cursor: pointer;\n  text-align: left;\n  color: var(--dsw-alias-label-primary);\n}\n@media (hover: hover) {\n  .Rows_searchResultRow:hover {\n    background-color: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.Rows_searchResultRow.Rows_selected {\n  background-color: var(--dsw-alias-interactive-bg-hover);\n}\n.Rows_searchResultHeading {\n  display: flex;\n  align-items: center;\n  min-width: 0;\n}\n.Rows_searchResultTitle {\n  flex: 0 1 auto;\n  min-width: 0;\n  margin: 0 var(--dsh-sidebar-label-gap);\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: var(--dsh-sidebar-title-size, 14px);\n  line-height: var(--dsh-sidebar-title-line, 20px);\n}\n.Rows_searchResultMeta {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  min-width: 0;\n  margin-left: calc(16px + var(--dsh-sidebar-label-gap));\n}\n.Rows_searchResultWorkspace,\n.Rows_searchResultSnippet {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: var(--dsh-sidebar-meta-size, 12px);\n  line-height: 17px;\n}\n.Rows_searchResultWorkspace {\n  flex: none;\n  max-width: 40%;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_searchResultWorkspace:only-child {\n  max-width: 100%;\n}\n.Rows_searchResultSnippet {\n  flex: 1;\n  min-width: 0;\n  color: var(--dsw-alias-label-secondary);\n}\n.Rows_projectRow {\n  height: var(--dsh-sidebar-row-height, 28px);\n  align-items: center;\n  box-sizing: border-box;\n}\n.Rows_projectRow .Rows_rowActions {\n  height: 20px;\n}\n.Rows_sessionRow {\n  height: var(--dsh-sidebar-row-height, 28px);\n  gap: 0;\n}\n.Rows_sessionRow .Rows_title {\n  margin: 0 6px 0 var(--dsh-sidebar-label-gap);\n}\n.Rows_slot {\n  flex: none;\n  width: 16px;\n  height: 20px;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_visuallyHidden {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  overflow: hidden;\n  clip: rect(0 0 0 0);\n  white-space: nowrap;\n}\n.Rows_folderActive {\n  color: var(--dsw-alias-state-business-primary);\n}\n.Rows_folderCustom {\n  color: var(--dsw-alias-label-secondary);\n}\n.Rows_sessionColorDot {\n  flex: none;\n  width: 8px;\n  height: 8px;\n  border-radius: 50%;\n}\n.Rows_projectRow .Rows_chevron {\n  display: none;\n}\n@media (hover: hover) {\n  .Rows_projectRow:hover .Rows_chevron {\n    display: inline-flex;\n  }\n  .Rows_projectRow:hover .Rows_folder {\n    display: none;\n  }\n}\n.Rows_arrow {\n  transition: transform 150ms var(--ds-ease-in-out);\n}\n.Rows_arrowOpen {\n  transform: rotate(90deg);\n}\n.Rows_projectText {\n  flex: 1;\n  min-width: 0;\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n}\n.Rows_title {\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: var(--dsh-sidebar-title-size, 14px);\n  line-height: var(--dsh-sidebar-title-line, 20px);\n}\n.Rows_renameInput {\n  min-width: 0;\n  font-size: var(--dsh-sidebar-title-size, 14px);\n  line-height: var(--dsh-sidebar-title-line, 20px);\n  padding: 0 2px;\n  border: 0.5px solid var(--dsw-alias-border-l4);\n  border-radius: var(--dsw-radius-sm);\n  background: var(--dsw-alias-button-elevated-fill);\n  color: inherit;\n  outline: none;\n}\n.Rows_sessionRow .Rows_title {\n  flex: 1;\n}\n.Rows_sessionRow .Rows_title[data-scrolled] {\n  mask-image:\n    linear-gradient(\n      to right,\n      transparent,\n      #000 12px);\n}\n.Rows_sessionRow .Rows_title[data-clipped] {\n  mask-image:\n    linear-gradient(\n      to left,\n      transparent,\n      #000 12px);\n}\n.Rows_sessionRow .Rows_title[data-scrolled][data-clipped] {\n  mask-image:\n    linear-gradient(\n      to right,\n      transparent,\n      #000 12px,\n      #000 calc(100% - 12px),\n      transparent);\n}\n.Rows_meta {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: var(--dsh-sidebar-meta-size, 12px);\n  line-height: 16px;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_workspaceChip {\n  flex: none;\n  max-width: 72px;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: var(--dsh-sidebar-time-size, 10px);\n  line-height: 16px;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_time {\n  flex: none;\n  font-size: var(--dsh-sidebar-time-size, 10px);\n  line-height: 16px;\n  color: var(--dsw-alias-label-tertiary);\n  margin-inline-end: -1px;\n}\n.Rows_pinIndicator {\n  display: inline-flex;\n  flex: none;\n  width: 16px;\n  height: 20px;\n  align-items: center;\n  justify-content: center;\n  margin-left: 6px;\n  color: var(--dsw-alias-label-caption);\n}\n.Rows_sessionRow.Rows_archived .Rows_title,\n.Rows_searchResultRow.Rows_archived .Rows_searchResultTitle,\n.Rows_searchResultRow.Rows_archived .Rows_searchResultWorkspace,\n.Rows_searchResultRow.Rows_archived .Rows_searchResultSnippet {\n  color: var(--dsw-alias-label-caption);\n}\n.Rows_dot {\n  flex: none;\n}\n.Rows_rowActions {\n  flex: none;\n  display: none;\n  align-items: center;\n  gap: 13px;\n}\n@media (hover: hover) {\n  .Rows_projectRow:hover .Rows_rowActions,\n  .Rows_searchResultRow:hover .Rows_rowActions {\n    display: inline-flex;\n  }\n}\n.Rows_projectRow.Rows_menuOpen .Rows_rowActions {\n  display: inline-flex;\n}\n.Rows_rowQuickActions {\n  display: contents;\n}\n.Rows_searchResultHeading .Rows_rowActions {\n  margin-left: auto;\n}\n.Rows_rowResting {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  gap: 6px;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_rowResting .Rows_pinIndicator {\n  margin-left: 0;\n}\n@media (hover: hover) {\n  .Rows_sessionRow:hover {\n    background-color: var(--dsw-alias-interactive-bg-hover);\n  }\n  .Rows_sessionRow:hover .Rows_rowActions,\n  .Rows_sessionRow.Rows_menuOpen .Rows_rowActions,\n  html[data-input-modality=keyboard] .Rows_sessionRow:focus-within .Rows_rowActions {\n    display: inline-flex;\n  }\n  .Rows_sessionRow:hover .Rows_rowResting,\n  .Rows_sessionRow.Rows_menuOpen .Rows_rowResting,\n  html[data-input-modality=keyboard] .Rows_sessionRow:focus-within .Rows_rowResting {\n    display: none;\n  }\n  .Rows_sessionRow:hover .Rows_title,\n  .Rows_sessionRow.Rows_menuOpen .Rows_title {\n    text-overflow: clip;\n  }\n}\n@media (hover: none) {\n  .Rows_projectRow .Rows_rowActions,\n  .Rows_searchResultRow .Rows_rowActions,\n  .Rows_sessionRow .Rows_rowActions {\n    display: inline-flex;\n  }\n  .Rows_sessionRow .Rows_timestamp,\n  .Rows_sessionRow:has(.Rows_pinnedAction) .Rows_pinIndicator,\n  .Rows_sessionRow .Rows_rowQuickActions > [data-slot] > :not(.Rows_pinnedAction),\n  .Rows_projectRow[aria-expanded=false] .Rows_rowActions {\n    display: none;\n  }\n  .Rows_sessionRow .Rows_pinnedAction {\n    order: -1;\n  }\n}\n.Rows_projectRow.Rows_menuOpen,\n.Rows_sessionRow.Rows_menuOpen {\n  background-color: var(--dsw-alias-interactive-bg-hover);\n}\n.Rows_sessionRow.Rows_dropBefore,\n.Rows_sessionRow.Rows_dropAfter {\n  position: relative;\n}\n.Rows_sessionRow.Rows_dropBefore::before,\n.Rows_sessionRow.Rows_dropAfter::after {\n  content: \"\";\n  position: absolute;\n  z-index: 1;\n  left: calc(-1 * var(--dsh-sidebar-paint-inset));\n  right: calc(4px - var(--dsh-sidebar-paint-inset));\n  height: 12px;\n  background:\n    linear-gradient(\n      55deg,\n      transparent calc(50% - 1px),\n      var(--dsw-alias-state-business-primary) calc(50% - 1px) calc(50% + 1px),\n      transparent calc(50% + 1px)) 0 0 / 5px 7px no-repeat,\n    linear-gradient(\n      125deg,\n      transparent calc(50% - 1px),\n      var(--dsw-alias-state-business-primary) calc(50% - 1px) calc(50% + 1px),\n      transparent calc(50% + 1px)) 0 5px / 5px 7px no-repeat,\n    linear-gradient(var(--dsw-alias-state-business-primary) 0 0) 4px 5px / calc(100% - 4px) 2px no-repeat;\n  pointer-events: none;\n}\n.Rows_sessionRow.Rows_dropBefore::before {\n  top: -7px;\n}\n.Rows_sessionRow.Rows_dropAfter::after {\n  bottom: -7px;\n}\n.Rows_hoverContent {\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n}\n.Rows_hoverTitle {\n  font-size: 14px;\n  line-height: 20px;\n  color: var(--dsw-alias-hovercard-label-primary);\n  overflow-wrap: break-word;\n}\n.Rows_hoverPath {\n  font-size: 12px;\n  line-height: 16px;\n  color: var(--dsw-alias-hovercard-label-secondary);\n  word-break: break-all;\n}\n.Rows_hoverTime {\n  font-size: 12px;\n  line-height: 16px;\n  color: var(--dsw-alias-hovercard-label-secondary);\n}\n.Rows_hoverStatus {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  font-size: 12px;\n  line-height: 20px;\n  color: var(--dsw-alias-hovercard-label-tertiary);\n}\n.Rows_hoverArchived svg {\n  flex-shrink: 0;\n  margin: 0 -4px;\n}\n.Rows_iconButton {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 24px;\n  height: 24px;\n  margin: -4px;\n  border: none;\n  border-radius: var(--dsw-radius-xs);\n  padding: 0;\n  background: transparent;\n  cursor: pointer;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_iconButton:focus-visible {\n  outline-offset: -2px;\n}\n@media (hover: hover) {\n  .Rows_iconButton:hover {\n    color: var(--dsw-alias-label-primary);\n  }\n}\n.Rows_chevron {\n  color: var(--dsw-alias-label-caption);\n}\n.Rows_bucketRow .Rows_chevron {\n  display: inline-flex;\n}\n.Rows_bucketRow .Rows_title {\n  color: var(--dsw-alias-label-secondary);\n}\n@media (prefers-reduced-motion: reduce) {\n  .Rows_arrow {\n    animation: none;\n    transition: none;\n  }\n}\n\n/* src/browser/WorkspacePicker.module.css */\n.WorkspacePicker_modalAction {\n  min-width: 72px;\n}\n.WorkspacePicker_modalError,\n.WorkspacePicker_menuStatus {\n  margin-top: 8px;\n  font-size: 12px;\n  line-height: 18px;\n}\n.WorkspacePicker_modalError {\n  color: var(--dsw-alias-state-error-primary);\n}\n.WorkspacePicker_menuStatus,\n.WorkspacePicker_pathSuffix {\n  color: var(--dsw-alias-label-secondary);\n}\n.WorkspacePicker_disambiguated {\n  display: flex;\n  gap: 4px;\n  min-width: 0;\n}\n.WorkspacePicker_title,\n.WorkspacePicker_pathSuffix {\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.WorkspacePicker_pathSuffix {\n  flex: none;\n  max-width: 75%;\n}\n"
   document.head.append(el)
 })();
 
