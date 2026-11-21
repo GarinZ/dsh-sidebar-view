@@ -88,6 +88,8 @@ type Plus = {
   tags: TagDefinition[]
   /** Session id to tag id; absent means the Session is untagged. */
   sessionTags: Record<string, string>
+  /** Tag key folded shut; a key absent here stays expanded. */
+  tagExpansion: Record<string, boolean>
 }
 
 /** Enough for every Workspace/Session one person is likely to decorate, and a hard stop for a corrupt store. */
@@ -96,7 +98,7 @@ const MAX_APPEARANCE_ENTRIES = 400
 const PLUS_KEY = 'dsh.workspace.view.sidebar-view.v1'
 const PLUS_INIT: Plus = {
   timeMode: false, statusFilter: 'all', timeBucketExpansion: {}, textScale: 'normal', showWorkspaceName: false,
-  workspaceIcons: {}, tags: [], sessionTags: {},
+  workspaceIcons: {}, tags: [], sessionTags: {}, tagExpansion: {},
 }
 
 /**
@@ -144,6 +146,21 @@ function readAppearanceRecord(raw: unknown, valid: (value: string) => boolean): 
   return out
 }
 
+/**
+ * Keep only boolean fold entries: a stale string or object cannot fold or open
+ * a group, so it degrades to "expanded" instead of breaking the tree.
+ * @param raw - the stored record.
+ * @returns a fresh record of the entries this build can honour.
+ */
+function readFoldRecord(raw: unknown): Record<string, boolean> {
+  if (typeof raw !== 'object' || raw === null) return {}
+  const out: Record<string, boolean> = {}
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof value === 'boolean') out[key] = value
+  }
+  return out
+}
+
 function readPlus(): Plus {
   try {
     const raw = globalThis.localStorage?.getItem(PLUS_KEY)
@@ -166,6 +183,7 @@ function readPlus(): Plus {
       workspaceIcons: readAppearanceRecord(parsed.workspaceIcons, value => parseIconSpec(value) !== null),
       tags,
       sessionTags: migrated?.sessionTags ?? readAppearanceRecord(parsed.sessionTags, value => tagIds.has(value)),
+      tagExpansion: readFoldRecord(parsed.tagExpansion),
     }
     if (migrated !== undefined) {
       try { globalThis.localStorage?.setItem(PLUS_KEY, JSON.stringify(plus)) } catch { /* quota */ }
@@ -378,6 +396,7 @@ function Seat(props: AnyProps & { Shipped: React.ComponentType<AnyProps> }): Rea
     workspaceIcons: plus.workspaceIcons,
     tags: plus.tags,
     sessionTags: plus.sessionTags,
+    tagExpansion: plus.tagExpansion,
   }), [shippedState, plus])
   const snapRef = React.useRef(snapshot)
   snapRef.current = snapshot
@@ -398,6 +417,9 @@ function Seat(props: AnyProps & { Shipped: React.ComponentType<AnyProps> }): Rea
     setStatusFilter: (filter: string): void => setPlus({ statusFilter: filter }),
     setTimeBucketExpanded: (key: string, expanded: boolean): void => {
       setPlus({ timeBucketExpansion: { ...plusState.timeBucketExpansion, [key]: expanded } })
+    },
+    setTagExpanded: (key: string, expanded: boolean): void => {
+      setPlus({ tagExpansion: { ...plusState.tagExpansion, [key]: expanded } })
     },
     setTextScale: (scale: TextScale): void => setPlus({ textScale: scale }),
     setShowWorkspaceName: (show: boolean): void => setPlus({ showWorkspaceName: show }),

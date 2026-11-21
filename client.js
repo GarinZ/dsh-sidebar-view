@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({id:"dsh-sidebar-view",factory:require=>{var module={exports:{}};var exports=module.exports;
-;try{console.info('[dsh-sidebar-view] build 2026-11-21T07:56:30.873Z')}catch(e){}
+;try{console.info('[dsh-sidebar-view] build 2026-11-21T08:51:35.038Z')}catch(e){}
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -6104,7 +6104,8 @@ var PLUS_INIT = {
   showWorkspaceName: false,
   workspaceIcons: {},
   tags: [],
-  sessionTags: {}
+  sessionTags: {},
+  tagExpansion: {}
 };
 function migrateSessionColors(legacy) {
   const colors = readAppearanceRecord(legacy, isSessionColorId);
@@ -6135,6 +6136,14 @@ function readAppearanceRecord(raw, valid) {
   }
   return out;
 }
+function readFoldRecord(raw) {
+  if (typeof raw !== "object" || raw === null) return {};
+  const out = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof value === "boolean") out[key] = value;
+  }
+  return out;
+}
 function readPlus() {
   try {
     const raw = globalThis.localStorage?.getItem(PLUS_KEY);
@@ -6152,7 +6161,8 @@ function readPlus() {
       showWorkspaceName: parsed.showWorkspaceName === true,
       workspaceIcons: readAppearanceRecord(parsed.workspaceIcons, (value) => parseIconSpec(value) !== null),
       tags,
-      sessionTags: migrated?.sessionTags ?? readAppearanceRecord(parsed.sessionTags, (value) => tagIds.has(value))
+      sessionTags: migrated?.sessionTags ?? readAppearanceRecord(parsed.sessionTags, (value) => tagIds.has(value)),
+      tagExpansion: readFoldRecord(parsed.tagExpansion)
     };
     if (migrated !== void 0) {
       try {
@@ -6355,7 +6365,8 @@ function Seat(props) {
     showWorkspaceName: plus.showWorkspaceName,
     workspaceIcons: plus.workspaceIcons,
     tags: plus.tags,
-    sessionTags: plus.sessionTags
+    sessionTags: plus.sessionTags,
+    tagExpansion: plus.tagExpansion
   }), [shippedState, plus]);
   const snapRef = React2.useRef(snapshot);
   snapRef.current = snapshot;
@@ -6378,6 +6389,9 @@ function Seat(props) {
     setStatusFilter: (filter) => setPlus({ statusFilter: filter }),
     setTimeBucketExpanded: (key, expanded) => {
       setPlus({ timeBucketExpansion: { ...plusState.timeBucketExpansion, [key]: expanded } });
+    },
+    setTagExpanded: (key, expanded) => {
+      setPlus({ tagExpansion: { ...plusState.tagExpansion, [key]: expanded } });
     },
     setTextScale: (scale) => setPlus({ textScale: scale }),
     setShowWorkspaceName: (show) => setPlus({ showWorkspaceName: show }),
