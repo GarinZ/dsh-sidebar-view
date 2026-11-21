@@ -401,8 +401,14 @@ function SessionTagPicker({ request, close, t, tags, sessionTags, onAssignTag, o
   // one click away; the pencil beside any other tag moves the editor there.
   const [editId, setEditId] = React.useState<string | null>(current?.id ?? null)
   const target = editId === null ? undefined : tags.find(tag => tag.id === editId)
-  const [name, setName] = React.useState(current?.name ?? '')
+  // Prefilled with the name the row shows, so an unnamed palette tag opens
+  // with its colour name instead of an empty field.
+  const [name, setName] = React.useState(current === undefined ? '' : tagName(current, t))
   const [color, setColor] = React.useState<SessionColorId>(current?.color ?? 'blue')
+  const nameRef = React.useRef<HTMLInputElement>(null)
+  // Bumped whenever the pencil asks for the editor, so the effect below can
+  // focus and select the name without stealing focus when the popover opens.
+  const [focusRequest, setFocusRequest] = React.useState(0)
 
   const assign = (tag: TagDefinition): void => {
     onAssignTag(request.sessionId, tag.id)
@@ -410,14 +416,26 @@ function SessionTagPicker({ request, close, t, tags, sessionTags, onAssignTag, o
   }
   const startEdit = (tag: TagDefinition): void => {
     setEditId(tag.id)
-    setName(tag.name)
+    // Start from the name the row shows: an unnamed palette tag displays its
+    // colour, so opening an empty field would read as a dead pencil.
+    setName(tagName(tag, t))
     setColor(tag.color)
+    setFocusRequest(request => request + 1)
   }
   const startCreate = (): void => {
     setEditId(null)
     setName('')
     setColor('blue')
+    setFocusRequest(request => request + 1)
   }
+  React.useEffect(() => {
+    if (focusRequest === 0) return
+    const input = nameRef.current
+    if (input === null) return
+    input.focus()
+    input.select()
+    input.scrollIntoView({ block: 'nearest' })
+  }, [focusRequest])
   const pickColor = (id: SessionColorId): void => {
     setColor(id)
     // Recolouring an existing tag is a live edit: every row in that group and
@@ -426,8 +444,13 @@ function SessionTagPicker({ request, close, t, tags, sessionTags, onAssignTag, o
   }
   const commit = (): void => {
     const trimmed = name.trim()
-    if (target !== undefined) onUpdateTag(target.id, trimmed === '' ? target.name : trimmed, color)
-    else onCreateTag(request.sessionId, trimmed, color)
+    if (target !== undefined) {
+      // Leaving an unnamed palette tag's colour name untouched keeps it
+      // unnamed, so it still follows a later recolour instead of freezing
+      // today's colour into a real name.
+      const untouchedFallback = target.name.trim() === '' && trimmed === tagName(target, t)
+      onUpdateTag(target.id, untouchedFallback || trimmed === '' ? target.name : trimmed, color)
+    } else onCreateTag(request.sessionId, trimmed, color)
     close()
   }
   const clear = (): void => {
@@ -510,6 +533,7 @@ function SessionTagPicker({ request, close, t, tags, sessionTags, onAssignTag, o
       <label className={css.nameRow}>
         <span className={css.nameLabel}>{t('appearance.tag.name')}</span>
         <input
+          ref={nameRef}
           className={css.nameInput}
           value={name}
           maxLength={MAX_TAG_NAME}
