@@ -153,6 +153,43 @@
   color: var(--dsw-alias-state-business-primary);
 }
 
+/* A user glyph sits in the folder's cell, so it wears the folder's tone; emoji
+   carry their own colours. */
+.folderCustom {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* A tagged row is the positioning context for its tab; untagged rows keep the
+   drop indicators anchored to the group, as before. */
+.sessionRow.tagged {
+  position: relative;
+}
+
+/* Tag tab: a short colour bar in the leading gutter, 7px before the content
+   start so it rides the tree indent instead of pinning to the row box. It
+   never replaces the status cell — an unread dot keeps its own lane. */
+.tagTab {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: calc(
+    var(--dsh-sidebar-row-padding) - var(--dsh-sidebar-paint-inset)
+    + var(--dsh-workspace-indent, 0px) - 7px
+  );
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* Tag group headers repeat the tag's colour beside the bucket name. */
+.bucketDot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
 
 /* Project leading slot: folder by default, expand arrow on row hover. */
 .projectRow .chevron { display: none; }
@@ -443,6 +480,23 @@
   line-height: 16px;
   color: var(--dsw-alias-hovercard-label-secondary);
   word-break: break-all;
+}
+
+/* The tag line repeats the row tab's hue so colour and name meet on the card. */
+.hoverTag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--dsw-alias-hovercard-label-secondary);
+}
+
+.hoverTagDot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
 }
 
 .hoverTime {

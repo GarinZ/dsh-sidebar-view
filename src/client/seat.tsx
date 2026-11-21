@@ -17,6 +17,12 @@
  *   component with the original props.
  */
 import * as React from 'react'
+import { MenuItemButton } from '@deepseek-ai/dsh-client-ui-primitives'
+import {
+  isSessionColorId, MAX_TAG_NAME, parseIconSpec, readTagDefinitions, type TagDefinition,
+} from '../browser/appearance.ts'
+import { AppearanceIcon } from '../browser/appearance-icon.tsx'
+import { requestAppearance, type AppearanceAnchor } from '../browser/appearance-request.ts'
 import { WorkspaceBrowser } from '../browser/rows/WorkspaceBrowser.tsx'
 import { de, en, es, fr, ja, pt, ru, zh } from '../browser/locales.ts'
 import { isTextScale, type TextScale } from '../browser/stores.ts'
@@ -37,12 +43,32 @@ const SLOT = 'sidebar.workspaces'
 
 type Dict = Record<string, string>
 type SlotEntry = { component: unknown; options?: { id?: string } }
+type Dispose = () => void
 type Slots = {
   entries(name: string): SlotEntry[]
   subscribe(name: string, fn: () => void): () => void
-  register(options: Record<string, unknown>, component: unknown): () => void
+  register(options: Record<string, unknown>, component: unknown): Dispose
+  inject(name: string, fn: () => undefined | Dispose | Iterable<Dispose>): void
 }
-type AnyCtx = { get(name: string): unknown; effect(fn: () => () => void, label: string): void }
+type LocaleService = { bind(namespace: string): Translate }
+/** One row of a shipped context menu; the shipped kinds are all this shape. */
+type MenuActionEntry = {
+  id: string
+  label: string
+  icon?: { key: string }
+  danger?: boolean
+  separatorBefore?: boolean
+  run: () => void
+}
+type ContextMenus = {
+  register(options: {
+    id: string
+    target: 'workspace'
+    order?: number
+    resolve: (owner: { workspaceId: string; displayTitle: string }) => readonly MenuActionEntry[]
+  }): Dispose
+}
+type AnyCtx = { get(name: string): unknown; effect(fn: () => Dispose, label: string): void }
 
 /* ------------------------------------------------------------------ *
  * Increment state: the fields the shipped store does not know about.
@@ -56,19 +82,97 @@ type Plus = {
   timeBucketExpansion: Record<string, boolean>
   textScale: TextScale
   showWorkspaceName: boolean
+  /** Workspace id to an `emoji:` / `icon:` spec; absent means the shipped folder glyph. */
+  workspaceIcons: Record<string, string>
+  /** Named color tags, in the order the picker lists them. */
+  tags: TagDefinition[]
+  /** Session id to tag id; absent means the Session is untagged. */
+  sessionTags: Record<string, string>
+  /** Tag key folded shut; a key absent here stays expanded. */
+  tagExpansion: Record<string, boolean>
 }
+
+/** Enough for every Workspace/Session one person is likely to decorate, and a hard stop for a corrupt store. */
+const MAX_APPEARANCE_ENTRIES = 400
 
 const PLUS_KEY = 'dsh.workspace.view.sidebar-view.v1'
 const PLUS_INIT: Plus = {
   timeMode: false, statusFilter: 'all', timeBucketExpansion: {}, textScale: 'normal', showWorkspaceName: false,
+  workspaceIcons: {}, tags: [], sessionTags: {}, tagExpansion: {},
+}
+
+/**
+ * Pre-tag snapshots stored a bare palette id per Session. Lift them into one
+ * unnamed tag per colour so the rows keep their dots, then drop the legacy
+ * field on the next write; a named tag is only ever created by the picker.
+ * @param legacy - the old `sessionColors` record.
+ * @returns migrated tags and their Session assignments.
+ */
+function migrateSessionColors(legacy: unknown): { tags: TagDefinition[]; sessionTags: Record<string, string> } {
+  const colors = readAppearanceRecord(legacy, isSessionColorId)
+  const tags: TagDefinition[] = []
+  const byColor = new Map<string, TagDefinition>()
+  const sessionTags: Record<string, string> = {}
+  for (const [sessionId, color] of Object.entries(colors)) {
+    let tag = byColor.get(color)
+    if (tag === undefined) {
+      tag = { id: `color-${color}`, name: '', color: color as TagDefinition['color'] }
+      byColor.set(color, tag)
+      tags.push(tag)
+    }
+    sessionTags[sessionId] = tag.id
+  }
+  return { tags, sessionTags }
+}
+
+/**
+ * Keep only entries this build can still render: a dropped icon name or an
+ * unknown palette id degrades to the default look instead of an empty cell.
+ * @param raw - the stored record.
+ * @param valid - predicate for one stored value.
+ * @returns a fresh record, capped at {@link MAX_APPEARANCE_ENTRIES}.
+ */
+function readAppearanceRecord(raw: unknown, valid: (value: string) => boolean): Record<string, string> {
+  if (typeof raw !== 'object' || raw === null) return {}
+  const out: Record<string, string> = {}
+  let kept = 0
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (kept >= MAX_APPEARANCE_ENTRIES) break
+    if (typeof value === 'string' && valid(value)) {
+      out[key] = value
+      kept += 1
+    }
+  }
+  return out
+}
+
+/**
+ * Keep only boolean fold entries: a stale string or object cannot fold or open
+ * a group, so it degrades to "expanded" instead of breaking the tree.
+ * @param raw - the stored record.
+ * @returns a fresh record of the entries this build can honour.
+ */
+function readFoldRecord(raw: unknown): Record<string, boolean> {
+  if (typeof raw !== 'object' || raw === null) return {}
+  const out: Record<string, boolean> = {}
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof value === 'boolean') out[key] = value
+  }
+  return out
 }
 
 function readPlus(): Plus {
   try {
     const raw = globalThis.localStorage?.getItem(PLUS_KEY)
     if (raw === null || raw === undefined) return PLUS_INIT
-    const parsed = JSON.parse(raw) as Partial<Plus>
-    return {
+    const parsed = JSON.parse(raw) as Partial<Plus> & { sessionColors?: unknown }
+    // Tags replaced the bare per-Session palette ids; lift a pre-tag snapshot
+    // once and rewrite the record so the legacy field does not linger.
+    const storedTags = readTagDefinitions(parsed.tags)
+    const migrated = storedTags.length === 0 ? migrateSessionColors(parsed.sessionColors) : undefined
+    const tags = migrated?.tags ?? storedTags
+    const tagIds = new Set(tags.map(tag => tag.id))
+    const plus: Plus = {
       timeMode: parsed.timeMode === true,
       statusFilter: typeof parsed.statusFilter === 'string' ? parsed.statusFilter : 'all',
       timeBucketExpansion: typeof parsed.timeBucketExpansion === 'object' && parsed.timeBucketExpansion !== null
@@ -76,7 +180,15 @@ function readPlus(): Plus {
         : {},
       textScale: isTextScale(parsed.textScale) ? parsed.textScale : PLUS_INIT.textScale,
       showWorkspaceName: parsed.showWorkspaceName === true,
+      workspaceIcons: readAppearanceRecord(parsed.workspaceIcons, value => parseIconSpec(value) !== null),
+      tags,
+      sessionTags: migrated?.sessionTags ?? readAppearanceRecord(parsed.sessionTags, value => tagIds.has(value)),
+      tagExpansion: readFoldRecord(parsed.tagExpansion),
     }
+    if (migrated !== undefined) {
+      try { globalThis.localStorage?.setItem(PLUS_KEY, JSON.stringify(plus)) } catch { /* quota */ }
+    }
+    return plus
   } catch {
     return PLUS_INIT
   }
@@ -102,11 +214,26 @@ function setPlus(patch: Partial<Plus>): void {
  * ------------------------------------------------------------------ */
 
 const PICKED = [
-  'groupBy.time',
+  'groupBy.time', 'groupBy.tag',
   'timeBucket.pinned', 'timeBucket.today', 'timeBucket.yesterday', 'timeBucket.week', 'timeBucket.earlier',
   'statusTabs.label', 'statusTab.all', 'statusTab.running', 'statusTab.pending', 'statusTab.unread',
   'textSize.label', 'textSize.small', 'textSize.normal', 'textSize.large', 'viewOptions.showWorkspaceName',
   'empty.noMatches',
+  'appearance.workspaceIcon', 'appearance.sessionColor',
+  'appearance.icon.title', 'appearance.color.title', 'appearance.icon.hint', 'appearance.color.hint',
+  'appearance.tab.emoji', 'appearance.tab.icon', 'appearance.search', 'appearance.noMatches',
+  'appearance.reset', 'appearance.done', 'appearance.noColor',
+  'appearance.tag.name', 'appearance.tag.placeholder', 'appearance.tag.save',
+  'appearance.tag.create', 'appearance.tag.new', 'appearance.tag.untagged',
+  'appearance.tag.delete', 'appearance.tag.edit', 'appearance.tag.editing',
+  'appearance.tag.deleteTitle', 'appearance.tag.deleteBody', 'appearance.tag.deleteBodyNone',
+  'appearance.tag.confirm', 'appearance.cancel',
+  'appearance.group.work', 'appearance.group.tech', 'appearance.group.nature', 'appearance.group.life',
+  'appearance.group.create', 'appearance.group.misc', 'appearance.group.animals', 'appearance.group.food',
+  'appearance.group.fun', 'appearance.group.symbols',
+  'appearance.color.red', 'appearance.color.orange', 'appearance.color.amber', 'appearance.color.green',
+  'appearance.color.teal', 'appearance.color.blue', 'appearance.color.violet', 'appearance.color.pink',
+  'appearance.color.gray',
 ]
 
 function pick(dict: Dict): Dict {
@@ -132,20 +259,86 @@ const LANG_BY_FLAT = new Map<string, Dict>(Object.entries(SHIPPED_FLAT).map(([la
 
 type Translate = (key: string, params?: Record<string, unknown>) => string
 
+/**
+ * Layer this plugin's dictionaries over the shipped translator. The shipped
+ * namespace renders in the same language as ours but carries none of our keys,
+ * so each lookup tries our dictionary first and falls back to the shipped one.
+ * @param shipped - translator bound to the shipped namespace.
+ * @returns a translator for the increment keys that never throws on a miss.
+ */
+function translateFor(shipped: Translate): Translate {
+  let dict: Dict = DICT_BY_LANG.zh
+  try {
+    dict = LANG_BY_FLAT.get(shipped('groupBy.flat')) ?? DICT_BY_LANG.zh
+  } catch {
+    dict = DICT_BY_LANG.zh
+  }
+  return (key: string, params?: Record<string, unknown>): string => {
+    const local = dict[key]
+    if (local !== undefined) {
+      if (params === undefined) return local
+      // Our dictionaries are plain templates, so fill {name}/{count} here
+      // instead of borrowing the shipped formatter's placeholders.
+      return local.replace(/\{(\w+)\}/g, (token, name: string) => {
+        const value = params[name]
+        return value === undefined ? token : String(value)
+      })
+    }
+    try { return shipped(key, params) } catch { return key }
+  }
+}
+
 function useCompositeT(shipped: Translate): Translate {
-  return React.useMemo(() => {
-    let dict: Dict = DICT_BY_LANG.zh
-    try {
-      const probe = shipped('groupBy.flat')
-      dict = LANG_BY_FLAT.get(probe) ?? DICT_BY_LANG.zh
-    } catch {
-      dict = DICT_BY_LANG.zh
-    }
-    return (key: string, params?: Record<string, unknown>): string => {
-      const local = dict[key]
-      return local !== undefined ? local : shipped(key, params)
-    }
-  }, [shipped])
+  return React.useMemo(() => translateFor(shipped), [shipped])
+}
+
+/* ------------------------------------------------------------------ *
+ * Menu contributions: the shipped Workspace and Session menus are the
+ * entry points, so we append one row to each instead of owning menus.
+ * ------------------------------------------------------------------ */
+
+/** The open-state pair a Session row menu passes to its entries. */
+type UseMenuOpenState = () => readonly [open: boolean, setOpen: (open: boolean) => void]
+
+type SessionColorItemProps = {
+  sessionId: string
+  displayTitle: string
+  useMenuOpenState: UseMenuOpenState
+}
+
+/**
+ * Viewport rect of a sidebar row, so the picker can open beside the row it
+ * edits instead of covering the window.
+ * @param rowKey - the row's data-row-key ("workspace:<id>" or "session:<id>").
+ */
+function anchorFor(rowKey: string): AppearanceAnchor | undefined {
+  const row = document.querySelector(`[data-row-key="${CSS.escape(rowKey)}"]`)
+  if (row === null) return undefined
+  const rect = row.getBoundingClientRect()
+  return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }
+}
+
+/** The palette glyph shared by the workspace and session menu rows. */
+function PaletteIcon(): React.ReactElement {
+  return React.createElement(AppearanceIcon, { spec: { kind: 'icon', value: 'palette' }, size: 16 })
+}
+
+/**
+ * "Set color" row appended to the shipped Session menu. The menu is still the
+ * shipped one; this row only requests the palette, dismissing first so the
+ * dialog is not mounted inside a popover that is closing.
+ * @param props - the row's Session identity and its menu's open state.
+ */
+function SessionTagMenuItem(props: SessionColorItemProps & { t: Translate }): React.ReactElement {
+  const { sessionId, displayTitle, t, useMenuOpenState } = props
+  const [, setMenuOpen] = useMenuOpenState()
+  return React.createElement(MenuItemButton, {
+    icon: React.createElement(PaletteIcon),
+    onSelect: () => {
+      setMenuOpen(false)
+      requestAppearance({ kind: 'session-tag', sessionId, displayTitle, anchor: anchorFor('session:' + sessionId) })
+    },
+  }, t('appearance.sessionColor'))
 }
 
 /* ------------------------------------------------------------------ *
@@ -211,6 +404,10 @@ function Seat(props: AnyProps & { Shipped: React.ComponentType<AnyProps> }): Rea
     timeBucketExpansion: plus.timeBucketExpansion,
     textScale: plus.textScale,
     showWorkspaceName: plus.showWorkspaceName,
+    workspaceIcons: plus.workspaceIcons,
+    tags: plus.tags,
+    sessionTags: plus.sessionTags,
+    tagExpansion: plus.tagExpansion,
   }), [shippedState, plus])
   const snapRef = React.useRef(snapshot)
   snapRef.current = snapshot
@@ -232,8 +429,45 @@ function Seat(props: AnyProps & { Shipped: React.ComponentType<AnyProps> }): Rea
     setTimeBucketExpanded: (key: string, expanded: boolean): void => {
       setPlus({ timeBucketExpansion: { ...plusState.timeBucketExpansion, [key]: expanded } })
     },
+    setTagExpanded: (key: string, expanded: boolean): void => {
+      setPlus({ tagExpansion: { ...plusState.tagExpansion, [key]: expanded } })
+    },
     setTextScale: (scale: TextScale): void => setPlus({ textScale: scale }),
     setShowWorkspaceName: (show: boolean): void => setPlus({ showWorkspaceName: show }),
+    setWorkspaceIcon: (workspaceId: string, spec: string | null): void => {
+      const next = { ...plusState.workspaceIcons }
+      if (spec === null) delete next[workspaceId]
+      else next[workspaceId] = spec
+      setPlus({ workspaceIcons: next })
+    },
+    setSessionTag: (sessionId: string, tagId: string | null): void => {
+      const next = { ...plusState.sessionTags }
+      if (tagId === null) delete next[sessionId]
+      else next[sessionId] = tagId
+      setPlus({ sessionTags: next })
+    },
+    createTag: (sessionId: string, name: string, color: string): void => {
+      const id = `tag-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+      const tag: TagDefinition = { id, name: name.slice(0, MAX_TAG_NAME), color: color as TagDefinition['color'] }
+      setPlus({
+        tags: [...plusState.tags, tag],
+        sessionTags: { ...plusState.sessionTags, [sessionId]: id },
+      })
+    },
+    updateTag: (tagId: string, name: string, color: string): void => {
+      setPlus({
+        tags: plusState.tags.map(tag => (tag.id === tagId
+          ? { ...tag, name: name.slice(0, MAX_TAG_NAME), color: color as TagDefinition['color'] }
+          : tag)),
+      })
+    },
+    deleteTag: (tagId: string): void => {
+      const nextSessionTags = { ...plusState.sessionTags }
+      for (const [sessionId, id] of Object.entries(nextSessionTags)) {
+        if (id === tagId) delete nextSessionTags[sessionId]
+      }
+      setPlus({ tags: plusState.tags.filter(tag => tag.id !== tagId), sessionTags: nextSessionTags })
+    },
   }), [shippedActions])
   const t = useCompositeT(rest.t)
   return React.createElement(WorkspaceBrowser as unknown as React.ComponentType<Record<string, unknown>>, {
@@ -255,6 +489,43 @@ export function apply(ctx: AnyCtx): void {
     return
   }
   const seated = new Map<SlotEntry, unknown>()
+  const locale = ctx.get('locale') as LocaleService | undefined
+  const contextMenus = ctx.get('contextMenus') as ContextMenus | undefined
+  let t: Translate = translateFor(() => { throw new Error('shipped locale unavailable') })
+  try {
+    if (locale !== undefined) t = translateFor(locale.bind('workspace'))
+  } catch { /* keep the built-in dictionary when the namespace is not registered yet */ }
+
+  // The Workspace "..." menu is built by the shipped package, so we add one row
+  // to it (and its icon into the shared icon slot) instead of owning a menu.
+  if (contextMenus !== undefined) {
+    ctx.effect(() => contextMenus.register({
+      id: 'workspace.appearance', target: 'workspace', order: 150,
+      resolve: ({ workspaceId, displayTitle }) => [{
+        id: 'icon',
+        label: t('appearance.workspaceIcon'),
+        icon: { key: 'workspace.appearance' },
+        run: () => { requestAppearance({ kind: 'workspace-icon', workspaceId, displayTitle, anchor: anchorFor('workspace:' + workspaceId) }) },
+      }],
+    }), 'dsh-sidebar-view: workspace icon menu action')
+  }
+  try {
+    slots.inject('contextMenu.icon', () => slots.register(
+      { name: 'contextMenu.icon', key: 'workspace.appearance' }, PaletteIcon,
+    ))
+  } catch (error) {
+    console.warn('[dsh-sidebar-view] shipped context-menu icon slot unavailable', error)
+  }
+  // The Session menu takes plain React entries; ours renders the shipped
+  // MenuItemButton so it inherits the menu's row metrics and focus handling.
+  try {
+    slots.inject('sidebar.workspaces.session.menu.item', () => slots.register(
+      { name: 'sidebar.workspaces.session.menu.item', id: 'dsh-sidebar-view-session-tag', order: 250 },
+      (props: SessionColorItemProps) => React.createElement(SessionTagMenuItem, { ...props, t }),
+    ))
+  } catch (error) {
+    console.warn('[dsh-sidebar-view] shipped session menu slot unavailable', error)
+  }
 
   const forceRerender = (): void => {
     try {

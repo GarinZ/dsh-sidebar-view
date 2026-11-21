@@ -18,9 +18,10 @@ export const FLAT_SESSION_ORDER_KEY = '__flat_session_order__'
 
 /**
  * Session-list grouping mode: sibling Workspace sections, a Workspace tree,
- * one flat list, or one flat list bucketed by update day.
+ * one flat list, one flat list bucketed by update day, or one bucketed by the
+ * Session's tag.
  */
-export type SessionGroupBy = 'workspace' | 'workspace-tree' | 'flat' | 'time'
+export type SessionGroupBy = 'workspace' | 'workspace-tree' | 'flat' | 'time' | 'tag'
 /** Session order: saved manual positions or current recency. */
 export type SessionOrderBy = 'manual' | 'updated'
 /**

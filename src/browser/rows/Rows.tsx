@@ -24,6 +24,8 @@ import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import { abbreviateHomePath } from '@deepseek-ai/dsh-util-workspace-path'
 import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { WorkspaceBrowserProps } from '../contract/slots.ts'
+import { parseIconSpec, sessionColorHex, type TagDefinition } from '../appearance.ts'
+import { AppearanceIcon } from '../appearance-icon.tsx'
 import type { GroupNode, SearchResultNode, SessionNode } from '../tree.ts'
 import css from './Rows.module.css'
 
@@ -228,6 +230,12 @@ type ProjectRowItemProps = {
   drag?: WorkspaceRowDragProps | undefined
   /** Host account home; POSIX home-rooted hover paths display as `~`. */
   home?: string | undefined
+  /**
+   * The user's leading glyph for this Workspace, as an `emoji:` / `icon:`
+   * spec. Absent keeps the shipped open/closed folder, so the row never
+   * depends on the appearance store having an entry.
+   */
+  appearanceIcon?: string | undefined
   t: RowTranslate
 } & Pick<WorkspaceBrowserProps, 'useWorkspaceAccess' | 'renderFactorySlot' | 'useContextMenuTarget' | 'useContextMenu'>
 
@@ -279,7 +287,7 @@ function WorkspaceProjectRow({ workspaceId, ...props }: ProjectRowItemProps & { 
 
 function ProjectRow({
   group, containsCurrentDescendant = false, onToggle, drag: offeredDrag, home, newShortcut, t, actions,
-  renderFactorySlot, useContextMenuTarget, useContextMenu,
+  appearanceIcon, renderFactorySlot, useContextMenuTarget, useContextMenu,
 }: Omit<ProjectRowItemProps, 'onCreate'> & { actions: ProjectRowActions }) {
   const { getTriggerProps } = useContextMenu()
   const drag = actions.reorder ? offeredDrag : undefined
@@ -287,6 +295,8 @@ function ProjectRow({
   const row = group
   // The ungrouped bucket has no workspace title: its label is dictionary copy.
   const label = row.workspaceId === undefined ? t('group.ungrouped') : row.label
+  // Decode once per render: a dropped icon name degrades to the folder.
+  const leadingIcon = appearanceIcon === undefined ? undefined : parseIconSpec(appearanceIcon)
   const active = containsCurrentDescendant || (group.expanded && group.containsCurrent)
   const menuOpen = useContextMenuTarget(target => target?.kind === 'workspace' && target.value.workspaceId === row.workspaceId)
   const dragPreview = useRowDragPreview(css.dragPreview as string, DRAG_PREVIEW_PROPERTIES)
@@ -311,8 +321,10 @@ function ProjectRow({
         }}
       onDragEnd={() => { if (dragPreview.clear()) drag?.end() }}
     >
-      <span className={clsx(css.slot, css.folder, active && css.folderActive)}>
-        {row.expanded ? <IconFolderOpenRegular /> : <IconFolderCloseRegular />}
+      <span className={clsx(css.slot, css.folder, active && css.folderActive, leadingIcon !== undefined && css.folderCustom)}>
+        {leadingIcon !== undefined
+          ? <AppearanceIcon spec={leadingIcon} size={16} />
+          : row.expanded ? <IconFolderOpenRegular /> : <IconFolderCloseRegular />}
       </span>
       <span className={clsx(css.slot, css.chevron)}>
         <IconTriangleRightFillRegular className={clsx(css.arrow, row.expanded && css.arrowOpen)} />
@@ -374,14 +386,16 @@ function ProjectRow({
  * @param props.expanded - whether the bucket's rows render below it.
  * @param props.onToggle - fold or unfold the bucket.
  * @param props.rowKey - bucket key for the row's DOM identity.
+ * @param props.accent - tag colour, when the bucket is a tag.
  * @returns the bucket header row.
  */
-export function TimeBucketRowItem({ label, count, expanded, onToggle, rowKey }: {
+export function TimeBucketRowItem({ label, count, expanded, onToggle, rowKey, accent }: {
   label: string
   count: number
   expanded: boolean
   onToggle: () => void
   rowKey: string
+  accent?: string | undefined
 }) {
   return (
     <div
@@ -394,6 +408,9 @@ export function TimeBucketRowItem({ label, count, expanded, onToggle, rowKey }: 
       <span className={clsx(css.slot, css.chevron)}>
         <IconTriangleRightFillRegular className={clsx(css.arrow, expanded && css.arrowOpen)} />
       </span>
+      {accent !== undefined && (
+        <span className={css.bucketDot} style={{ backgroundColor: accent }} aria-hidden="true" />
+      )}
       <span className={css.projectText}>
         <span className={css.title}>{label}</span>
       </span>
@@ -482,6 +499,30 @@ function SessionStatusDots({ statuses }: { statuses: readonly [SessionStatus, ..
   )
 }
 
+/**
+ * A tag's display name: the user's name when there is one, else the palette
+ * colour's localized name, so colour is never the only carrier.
+ */
+function tagLabel(tag: TagDefinition, t: RowTranslate): string {
+  return tag.name.trim() === '' ? t(`appearance.color.${tag.color}`) : tag.name
+}
+
+/**
+ * Tag tab: a short colour bar in the row's leading gutter. It rides beside the
+ * native status cell instead of replacing it, so a finished-but-unread dot and
+ * a green tag can never merge into one blob. The bar is decorative; the tag
+ * name reaches assistive tech through the row's hidden text, and sighted users
+ * through the hover card.
+ */
+function SessionTagTab({ accent, label }: { accent: string; label: string }) {
+  return (
+    <>
+      <span className={css.tagTab} style={{ backgroundColor: accent }} aria-hidden="true" />
+      <span className={css.visuallyHidden}>{label}</span>
+    </>
+  )
+}
+
 /** Non-interactive pinned-row marker; the enclosing row remains the only action. */
 function PinnedIndicator({ t }: { t: RowTranslate }) {
   const label = t('row.pinned')
@@ -493,14 +534,17 @@ function PinnedIndicator({ t }: { t: RowTranslate }) {
 }
 
 /**
- * Hover-card body: full title, display working directory, relative time, the Session's own scheduled-task
- * section, and every relevant live status. The task section sits above the
- * status lines so they stay the card's trailing status line.
+ * Hover-card body: full title, display working directory, the tag it wears,
+ * relative time, the Session's own scheduled-task section, and every relevant
+ * live status. The task section sits above the status lines so they stay the
+ * card's trailing status line.
  */
-function SessionHoverContent({ node, cwd, now, renderSlot, t }: {
+function SessionHoverContent({ node, cwd, tag, now, renderSlot, t }: {
   node: SessionNode
   /** Display working directory; absent omits the line. */
   cwd: string | undefined
+  /** Worn tag; the card is where its colour gets a name. */
+  tag?: TagDefinition | undefined
   now: number
   renderSlot: RowRenderSlots
   t: RowTranslate
@@ -513,6 +557,16 @@ function SessionHoverContent({ node, cwd, now, renderSlot, t }: {
     <div className={css.hoverContent}>
       <div className={css.hoverTitle}>{displayTitle(node, t)}</div>
       {cwd !== undefined && <div className={css.hoverPath}>{cwd}</div>}
+      {tag !== undefined && (
+        <div className={css.hoverTag}>
+          <span
+            className={css.hoverTagDot}
+            style={{ backgroundColor: sessionColorHex(tag.color) ?? 'transparent' }}
+            aria-hidden="true"
+          />
+          <span>{tagLabel(tag, t)}</span>
+        </div>
+      )}
       {/* Same placeholder rule as the row's trailing cell: no timestamp
           before the first prompt. */}
       {!node.blank && <div className={css.hoverTime}>{hoverTimeLabel(node.updatedAt, now, t)}</div>}
@@ -633,7 +687,7 @@ export function SearchResultItem({
  */
 export function SessionNodeItem({
   node, currentId, now, onOpen, onRenameRequest, renderSlot, renderFactorySlot, useContextMenuTarget,
-  useContextMenu, onReveal, drag, home, useSessionAccess, t, workspaceLabel,
+  useContextMenu, onReveal, drag, home, useSessionAccess, t, workspaceLabel, tag,
 }: {
   useContextMenu: WorkspaceBrowserProps['useContextMenu']
   renderFactorySlot: WorkspaceBrowserProps['renderFactorySlot']
@@ -656,6 +710,12 @@ export function SessionNodeItem({
    * Omitted when the view option is off, which is the default.
    */
   workspaceLabel?: string | undefined
+  /**
+   * The tag this Session wears. It colours a short bar in the row's leading
+   * gutter and names itself on the hover card; the 16px status cell stays
+   * native, so a finished-but-unread dot and the tag never collide.
+   */
+  tag?: TagDefinition | undefined
   t: RowTranslate
 } & Pick<WorkspaceBrowserProps, 'useSessionAccess'> & PropsRenderSlots<
   | 'sidebar.workspaces.session.row.action'
@@ -678,6 +738,9 @@ export function SessionNodeItem({
   const draggable = drag !== undefined && reorderable && !row.blank && !row.archived
   const menuOpen = useContextMenuTarget(target => target?.kind === 'session' && target.value.sessionId === node.id)
   const dragPreview = useRowDragPreview(css.dragPreview as string, DRAG_PREVIEW_PROPERTIES)
+  // A tag whose palette id no longer resolves (an edited palette, an older
+  // build) simply draws no tab; the row itself stays untouched.
+  const tagAccent = tag === undefined ? undefined : sessionColorHex(tag.color)
   const rowRef = useRef<HTMLDivElement>(null)
   const titleRef = useRef<HTMLSpanElement>(null)
   // On macOS the click that activates the window is not delivered, but the
@@ -702,6 +765,7 @@ export function SessionNodeItem({
       className={clsx(
         css.sessionRow, selected && css.selected, menuOpen && css.menuOpen,
         row.archived && css.archived,
+        tag !== undefined && css.tagged,
         drag?.marker === 'before' && css.dropBefore, drag?.marker === 'after' && css.dropAfter,
       )}
       role="treeitem"
@@ -749,6 +813,9 @@ export function SessionNodeItem({
           and is cleared by opening the session. Archived rows keep the slot
           blank — the grayed row carries the archived look — and their live
           status stays on the hover card only. */}
+      {!row.blank && tag !== undefined && tagAccent !== undefined && (
+        <SessionTagTab accent={tagAccent} label={tagLabel(tag, t)} />
+      )}
       <span className={css.slot}>
         {!row.archived && !row.blank && (showStatus
           ? <SessionStatusDots statuses={statuses} />
@@ -814,6 +881,7 @@ export function SessionNodeItem({
       content={<SessionHoverContent
         node={node}
         cwd={row.cwd === undefined ? undefined : abbreviateHomePath(row.cwd, home)}
+        tag={tag}
         now={now}
         renderSlot={renderSlot}
         t={t}

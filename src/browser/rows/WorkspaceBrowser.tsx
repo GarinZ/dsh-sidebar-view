@@ -18,6 +18,9 @@ import {
   Fragment, type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useRef, useState,
 } from 'react'
 import clsx from 'clsx'
+import { AppearanceDialogs } from './AppearanceDialogs.tsx'
+import { AppearanceIcon } from '../appearance-icon.tsx'
+import { sessionColorHex, type TagDefinition } from '../appearance.ts'
 import { WorkspaceDialogs } from './WorkspaceDialogs.tsx'
 import {
   AnimatedRows, HoverCardGroup, IconArchiveCheckOutlineRegular, IconArchiveOffOutlineRegular, IconArchiveOutlineRegular,
@@ -39,9 +42,9 @@ import type {
   SessionTimeBucket,
 } from '../tree.ts'
 import {
-  deriveFlat, deriveGroups, deriveSearchResults, deriveTimeGroups, matchesStatusFilter, orderByRecency,
-  owningGroupKey, owningParentFolder, pinCurrentBlank, reconcileManualOrder, sessionMemberIds,
-  TIME_BUCKET_ORDER, UNGROUPED_KEY,
+  deriveFlat, deriveGroups, deriveSearchResults, deriveTagGroups, deriveTimeGroups, matchesStatusFilter,
+  orderByRecency, owningGroupKey, owningParentFolder, pinCurrentBlank, reconcileManualOrder, sessionMemberIds,
+  TIME_BUCKET_ORDER, UNGROUPED_KEY, UNTAGGED_TAG_KEY,
 } from '../tree.ts'
 import { ProjectRowItem, SearchResultItem, SessionNodeItem, TimeBucketRowItem } from './Rows.tsx'
 import { FLAT_SESSION_ORDER_KEY, TEXT_SCALE_CSS, type SessionGroupBy, type TextScale } from '../stores.ts'
@@ -53,6 +56,16 @@ import css from './WorkspaceBrowser.module.css'
  * focus() forces a synchronous layout and would jank the slide.
  */
 const EXPAND_SLIDE_MS = 300
+/**
+ * Stable empty maps for the appearance selectors: a fresh object per render
+ * would break every equality check downstream, and most users decorate nothing.
+ */
+const NO_APPEARANCE: Readonly<Record<string, string>> = {}
+/** Stable empty tag list and fold map, for the same reason. */
+const NO_TAGS: readonly TagDefinition[] = []
+const NO_TAGS_BY_SESSION: Readonly<Record<string, TagDefinition>> = {}
+const NO_FOLDS: Readonly<Record<string, boolean>> = {}
+
 /** Pause between the latest keystroke and a Host content-search request. */
 const SEARCH_DEBOUNCE_MS = 250
 /** `session.search` wire bound, measured in JavaScript UTF-16 code units. */
@@ -179,6 +192,7 @@ function ViewOptionsMenu({
         { id: 'workspace-tree', label: t('groupBy.workspaceTree'), icon: <IconWorkspaceTreeOutlineRegular /> },
         { id: 'flat', label: t('groupBy.flat'), icon: <IconFlatListOutlineRegular /> },
         { id: 'time', label: t('groupBy.time'), icon: <IconClockOutlineRegular /> },
+        { id: 'tag', label: t('groupBy.tag'), icon: <AppearanceIcon spec={{ kind: 'icon', value: 'tag' }} size={16} /> },
         { type: 'separator' as const, id: 'order-by-separator' },
         { type: 'label' as const, id: 'order-by', text: t('orderBy.label') },
         { id: 'manual', label: t('orderBy.manual'), icon: <IconChevronsUpDownOutlineRegular /> },
@@ -192,7 +206,7 @@ function ViewOptionsMenu({
         { default: 'hide-archived', show: 'show-archived', only: 'only-archived' }[archivedFilter],
       ]}
       onSelect={(id) => {
-        if (id === 'workspace' || id === 'workspace-tree' || id === 'flat' || id === 'time') onGroupPick(id)
+        if (id === 'workspace' || id === 'workspace-tree' || id === 'flat' || id === 'time' || id === 'tag') onGroupPick(id)
         else if (id === 'manual' || id === 'updated') onOrderPick(id)
         else if (id === 'show-workspace-name') onShowWorkspaceNameToggle(!showWorkspaceName)
         else if (id === 'hide-archived') onArchivedFilterPick('default')
@@ -347,6 +361,10 @@ type SessionTreeProps = Pick<
   revealSessionId?: SessionId | undefined
   /** Acknowledge that the chosen Session row has been revealed. */
   onSessionRevealed: (sessionId: SessionId) => void
+  /** Stored icon specs by Workspace id; absent until someone sets one. */
+  workspaceIcons?: Readonly<Record<string, string>> | undefined
+  /** Tag worn by each Session; absent while the Session wears none. */
+  tagsBySession?: Readonly<Record<string, TagDefinition>> | undefined
 }
 
 /** The list-empty placeholder — a glyph over the text; a narrowed view names which filter emptied it. */
@@ -380,6 +398,7 @@ function SessionTree({
   nestWorkspaces, groupExpansion, setGroupExpanded, statusFilter,
   setSessionOrder, home, t,
   revealSessionId, onSessionRevealed, shortcuts,
+  workspaceIcons, tagsBySession,
 }: SessionTreeProps) {
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
   const statuses = useSessionStatus(s => s)
@@ -617,6 +636,7 @@ function SessionTree({
           renderFactorySlot={renderFactorySlot} useContextMenu={useContextMenu} useContextMenuTarget={useContextMenuTarget}
           useWorkspaceAccess={useWorkspaceAccess}
           containsCurrentDescendant={currentAncestors.has(group.key)}
+          appearanceIcon={group.workspaceId === undefined ? undefined : (workspaceIcons ?? NO_APPEARANCE)[group.workspaceId]}
           home={home}
           t={t}
           onToggle={() => {
@@ -683,6 +703,7 @@ function SessionTree({
               home={home}
               useSessionAccess={useSessionAccess}
               t={t}
+              tag={(tagsBySession ?? NO_TAGS_BY_SESSION)[node.id]}
             />
           )
         })}
@@ -737,7 +758,7 @@ function SessionTree({
 /** The flat "In one list" body: every session is one draggable top-level row. */
 function FlatList({
   list, sessionIds, rowState, onLeaveArchivedOnly, useSessionStatus, useSessionAccess, open, onSessionRenameRequest,
-  usePanelInfo, setSessionOrder, workspaceReady, animationResetKey, statusFilter, workspaceLabelOf,
+  usePanelInfo, setSessionOrder, workspaceReady, animationResetKey, statusFilter, workspaceLabelOf, tagsBySession,
   revealSessionId, onSessionRevealed, renderSlot, renderFactorySlot, useContextMenuTarget, useContextMenu, home, t,
 }: Pick<
   SessionTreeProps,
@@ -763,6 +784,8 @@ function FlatList({
   sessionIds: readonly SessionId[]
   /** Workspace name per Session; absent while the option is off. */
   workspaceLabelOf?: ((id: SessionId) => string | undefined) | undefined
+  /** Tag worn by each Session; absent while the Session wears none. */
+  tagsBySession?: Readonly<Record<string, TagDefinition>> | undefined
 }) {
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
   const statuses = useSessionStatus(s => s)
@@ -814,6 +837,7 @@ function FlatList({
               useContextMenu={useContextMenu}
               useContextMenuTarget={useContextMenuTarget}
               workspaceLabel={workspaceLabelOf?.(node.id)}
+              tag={(tagsBySession ?? NO_TAGS_BY_SESSION)[node.id]}
               onReveal={node.id === revealSessionId
                 ? () => { onSessionRevealed(node.id) }
                 : undefined}
@@ -856,7 +880,7 @@ function FlatList({
  * card. Buckets fold from their own header.
  */
 function TimeGroups({
-  list, sessionIds, rowState, statusFilter, bucketExpansion, onToggleBucket, workspaceLabelOf,
+  list, sessionIds, rowState, statusFilter, bucketExpansion, onToggleBucket, workspaceLabelOf, tagsBySession,
   onLeaveArchivedOnly, useSessionStatus, useSessionAccess, open, onSessionRenameRequest,
   usePanelInfo, workspaceReady, animationResetKey, revealSessionId, onSessionRevealed,
   renderSlot, renderFactorySlot, useContextMenuTarget, useContextMenu, home, t, setSessionOrder,
@@ -882,6 +906,8 @@ function TimeGroups({
   sessionIds: readonly SessionId[]
   /** Workspace name per Session; absent while the option is off. */
   workspaceLabelOf?: ((id: SessionId) => string | undefined) | undefined
+  /** Tag worn by each Session; absent while the Session wears none. */
+  tagsBySession?: Readonly<Record<string, TagDefinition>> | undefined
   rowState: SessionRowState
   statusFilter: SessionStatusFilter
   /** Folded buckets by key; an absent key stays open. */
@@ -971,6 +997,7 @@ function TimeGroups({
                   useContextMenu={useContextMenu}
                   useContextMenuTarget={useContextMenuTarget}
                   workspaceLabel={workspaceLabelOf?.(node.id)}
+                  tag={(tagsBySession ?? NO_TAGS_BY_SESSION)[node.id]}
                   onReveal={node.id === revealSessionId ? () => { onSessionRevealed(node.id) } : undefined}
                   useSessionAccess={useSessionAccess}
                   drag={{
@@ -1007,6 +1034,122 @@ function TimeGroups({
                 />
               )
             })}
+          </Fragment>
+        ))}
+      </AnimatedRows>
+    </HoverCardGroup>
+  )
+}
+
+/**
+ * The flattened cross-project body, bucketed by tag: named tags in picker
+ * order, the untagged bucket last. The tag colour leads its header, so a
+ * folded group still says which tag it is. Rows keep the whole width for the
+ * title; a Session's tag is the group it sits in. Tags fold from their own
+ * header, and rows do not drag here — membership is the tag, not a position.
+ */
+function TagGroups({
+  list, sessionIds, rowState, statusFilter, tags, sessionTags, tagExpansion, onToggleTag,
+  workspaceLabelOf,
+  onLeaveArchivedOnly, useSessionStatus, useSessionAccess, open, onSessionRenameRequest,
+  usePanelInfo, workspaceReady, animationResetKey, revealSessionId, onSessionRevealed,
+  renderSlot, renderFactorySlot, useContextMenuTarget, useContextMenu, home, t,
+}: Pick<
+  SessionTreeProps,
+  | 'useSessionStatus'
+  | 'useSessionAccess'
+  | 'open'
+  | 'onSessionRenameRequest'
+  | 'renderSlot'
+  | 'renderFactorySlot' | 'useContextMenuTarget' | 'useContextMenu'
+  | 'usePanelInfo'
+  | 'workspaceReady'
+  | 'animationResetKey'
+  | 'revealSessionId'
+  | 'onSessionRevealed'
+  | 'onLeaveArchivedOnly'
+  | 'home'
+  | 't'
+> & {
+  list: SessionListState
+  sessionIds: readonly SessionId[]
+  /** Workspace name per Session; absent while the option is off. */
+  workspaceLabelOf?: ((id: SessionId) => string | undefined) | undefined
+  rowState: SessionRowState
+  statusFilter: SessionStatusFilter
+  /** Named tags in picker order. */
+  tags: readonly TagDefinition[]
+  /** Tag id by Session. */
+  sessionTags: Readonly<Record<string, string>>
+  /** Folded tag keys; an absent key stays open. */
+  tagExpansion: Readonly<Record<string, boolean>>
+  onToggleTag: (key: string, expanded: boolean) => void
+}) {
+  const panelActive = usePanelInfo(info => info.activePanelId !== null)
+  const statuses = useSessionStatus(s => s)
+  const now = Date.now()
+  const expandedTags = useMemo(
+    () => [...tags.map(tag => tag.id), UNTAGGED_TAG_KEY].filter(key => tagExpansion[key] !== false),
+    [tagExpansion, tags],
+  )
+  const untaggedLabel = t('appearance.tag.untagged')
+  const colorLabel = useCallback((color: string) => t('appearance.color.' + color), [t])
+  const groups = useMemo(
+    () => deriveTagGroups(list, sessionIds, rowState, statuses, {
+      tags, sessionTags, expandedTags, statusFilter, colorLabel, untaggedLabel,
+    }),
+    [colorLabel, expandedTags, list, rowState, sessionIds, sessionTags, statusFilter, statuses, tags, untaggedLabel],
+  )
+  const currentId = panelActive
+    ? undefined
+    : Object.values(list.byId).find(session => (session.retainedBy.mainView ?? 0) > 0)?.id
+  const rowKeys: string[] = []
+  for (const group of groups) {
+    rowKeys.push(`bucket:${group.key}`)
+    for (const session of group.sessions) rowKeys.push(`session:${session.id}`)
+  }
+  return (
+    <HoverCardGroup className={clsx(css.treeBody, css.wide)}>
+      <AnimatedRows
+        className={clsx(css.list, css.flatList)}
+        role="tree"
+        label={t('section.sessions')}
+        rowKeys={rowKeys.length === 0 ? ['empty'] : rowKeys}
+        ready={list.phase === 'ready' && workspaceReady}
+        resetKey={animationResetKey}
+      >
+        {groups.length === 0 && (
+          <EmptySessions rowState={rowState} statusFilter={statusFilter} onLeaveArchivedOnly={onLeaveArchivedOnly} t={t} />
+        )}
+        {groups.map(group => (
+          <Fragment key={group.key}>
+            <TimeBucketRowItem
+              rowKey={group.key}
+              label={group.label}
+              count={group.sessionCount}
+              expanded={group.expanded}
+              accent={group.color === undefined ? undefined : sessionColorHex(group.color)}
+              onToggle={() => { onToggleTag(group.key, !group.expanded) }}
+            />
+            {group.sessions.map(node => (
+              <SessionNodeItem
+                key={node.id}
+                node={node}
+                currentId={currentId}
+                now={now}
+                onOpen={open}
+                onRenameRequest={onSessionRenameRequest}
+                renderSlot={renderSlot}
+                renderFactorySlot={renderFactorySlot}
+                useContextMenu={useContextMenu}
+                useContextMenuTarget={useContextMenuTarget}
+                workspaceLabel={workspaceLabelOf?.(node.id)}
+                onReveal={node.id === revealSessionId ? () => { onSessionRevealed(node.id) } : undefined}
+                useSessionAccess={useSessionAccess}
+                home={home}
+                t={t}
+              />
+            ))}
           </Fragment>
         ))}
       </AnimatedRows>
@@ -1220,6 +1363,31 @@ export function WorkspaceBrowser({
   const timeBucketExpansion = useStore(s => s.timeBucketExpansion ?? {})
   const textScale = useStore(s => s.textScale ?? 'normal')
   const showWorkspaceName = useStore(s => s.showWorkspaceName === true)
+  const workspaceIcons = useStore(s => (s.workspaceIcons ?? NO_APPEARANCE) as Readonly<Record<string, string>>)
+  const tags = useStore(s => (s.tags ?? NO_TAGS) as readonly TagDefinition[])
+  const sessionTags = useStore(s => (s.sessionTags ?? NO_APPEARANCE) as Readonly<Record<string, string>>)
+  const tagExpansion = useStore(s => (s.tagExpansion ?? NO_FOLDS) as Readonly<Record<string, boolean>>)
+  // Rows take the tag itself, so the leading tab and the hover-card label
+  // resolve once here instead of threading the tag list through every list.
+  const tagsBySession = useMemo<Readonly<Record<string, TagDefinition>>>(() => {
+    if (tags.length === 0) return NO_TAGS_BY_SESSION
+    const byId = new Map(tags.map(tag => [tag.id, tag]))
+    const lookup: Record<string, TagDefinition> = {}
+    for (const [sessionId, tagId] of Object.entries(sessionTags)) {
+      const tag = byId.get(tagId)
+      if (tag !== undefined) lookup[sessionId] = tag
+    }
+    return lookup
+  }, [sessionTags, tags])
+  // The appearance actions are this plugin's own spin on the shipped action
+  // bag, so they arrive past the shipped component's type.
+  const appearanceActions = actions as unknown as {
+    setWorkspaceIcon?: (workspaceId: string, spec: string | null) => void
+    setSessionTag?: (sessionId: string, tagId: string | null) => void
+    createTag?: (sessionId: string, name: string, color: string) => void
+    updateTag?: (tagId: string, name: string, color: string) => void
+    deleteTag?: (tagId: string) => void
+  }
   const groupExpansion = useStore(s => s.groupExpansion)
   const sessionOrderByAccount = useStore(s => s.sessionOrderByAccount)
   // Archived sessions are not openable: the row stays visible under the
@@ -1691,6 +1859,7 @@ export function WorkspaceBrowser({
                 rowState={rowState}
                 statusFilter={statusFilter}
                 workspaceLabelOf={workspaceLabelOf}
+                tagsBySession={tagsBySession}
                 bucketExpansion={timeBucketExpansion}
                 onToggleBucket={actions.setTimeBucketExpanded}
                 onLeaveArchivedOnly={leaveArchivedOnly}
@@ -1709,7 +1878,36 @@ export function WorkspaceBrowser({
                 t={t}
               />
             )
-            : groupBy === 'flat'
+            : groupBy === 'tag'
+              ? (
+                <TagGroups
+                  useSessionAccess={useSessionAccess}
+                  usePanelInfo={usePanelInfo}
+                  list={list}
+                  sessionIds={orderedFlatSessionIds}
+                  rowState={rowState}
+                  statusFilter={statusFilter}
+                  tags={tags}
+                  sessionTags={sessionTags}
+                  tagExpansion={tagExpansion}
+                  onToggleTag={actions.setTagExpanded}
+                  workspaceLabelOf={workspaceLabelOf}
+                  onLeaveArchivedOnly={leaveArchivedOnly}
+                  workspaceReady={workspaceReady}
+                  animationResetKey={`${groupBy}/${orderBy}/${archivedFilter}/${statusFilter}`}
+                  useSessionStatus={useSessionStatus}
+                  open={guardedOpen}
+                  onSessionRenameRequest={requestSessionRename}
+                  renderSlot={renderSlot}
+                  renderFactorySlot={renderFactorySlot} useContextMenu={useContextMenu}
+                  useContextMenuTarget={useContextMenuTarget}
+                  revealSessionId={revealSessionId}
+                  onSessionRevealed={acknowledgeSessionReveal}
+                  home={home}
+                  t={t}
+                />
+              )
+              : groupBy === 'flat'
               ? (
                 <FlatList
                   useSessionAccess={useSessionAccess}
@@ -1719,6 +1917,7 @@ export function WorkspaceBrowser({
                   rowState={rowState}
                   statusFilter={statusFilter}
                   workspaceLabelOf={workspaceLabelOf}
+                  tagsBySession={tagsBySession}
                   onLeaveArchivedOnly={leaveArchivedOnly}
                   workspaceReady={workspaceReady}
                   animationResetKey={`${groupBy}/${orderBy}/${archivedFilter}/${statusFilter}`}
@@ -1750,6 +1949,8 @@ export function WorkspaceBrowser({
                   workspaces={orderedWorkspaces}
                   ungroupedSessionIds={orderedUngroupedSessionIds}
                   workspaceReady={workspaceReady}
+                  workspaceIcons={workspaceIcons}
+                  tagsBySession={tagsBySession}
                   nestWorkspaces={groupBy === 'workspace-tree'}
                   animationResetKey={`${groupBy}/${orderBy}/${archivedFilter}/${statusFilter}`}
                   statusFilter={statusFilter}
@@ -1772,6 +1973,18 @@ export function WorkspaceBrowser({
       {workspaceActionRequest !== null && <WorkspaceDialogs key={`${workspaceActionRequest.action}/${workspaceActionRequest.workspaceId}`}
         request={workspaceActionRequest} workspaces={workspaces} renameWorkspace={renameWorkspace} deleteWorkspace={deleteWorkspace}
         settleWorkspaceAction={settleWorkspaceAction} t={t} />}
+
+      <AppearanceDialogs
+        t={t}
+        workspaceIcons={workspaceIcons}
+        tags={tags}
+        sessionTags={sessionTags}
+        onWorkspaceIcon={(workspaceId, spec) => { appearanceActions.setWorkspaceIcon?.(workspaceId, spec) }}
+        onAssignTag={(sessionId, tagId) => { appearanceActions.setSessionTag?.(sessionId, tagId) }}
+        onCreateTag={(sessionId, name, color) => { appearanceActions.createTag?.(sessionId, name, color) }}
+        onUpdateTag={(tagId, name, color) => { appearanceActions.updateTag?.(tagId, name, color) }}
+        onDeleteTag={tagId => { appearanceActions.deleteTag?.(tagId) }}
+      />
     </div>
   )
 }
