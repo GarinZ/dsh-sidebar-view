@@ -14,6 +14,8 @@
 
 When five or six sessions are open and you come back the next day, the shipped sidebar only stacks them by workspace, so you scroll until you recognize "the one that touched CI yesterday". This plugin adds a fourth grouping mode, by time, and a row of status tabs with live counts — pinned, today, yesterday, this week, earlier — so you can see what is running and what finished while you were away.
 
+It changes how the sidebar is presented and nothing else — a UI add-on rather than a fork. Session data, search and the workspace store stay native, and any failure falls back to the shipped UI.
+
 ![Three views: the view-options menu, grouping by time, and the one-list view](https://raw.githubusercontent.com/GarinZ/dsh-sidebar-view/main/docs/screenshots/overview.png)
 
 *① The new “By time” entry in View options　② Pinned → Today → Yesterday → This week, each header with a count and collapse　③ One list across projects, optionally labelled with the workspace name*
