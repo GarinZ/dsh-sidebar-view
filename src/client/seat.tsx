@@ -17,6 +17,10 @@
  *   component with the original props.
  */
 import * as React from 'react'
+import { MenuItemButton } from '@deepseek-ai/dsh-client-ui-primitives'
+import { isSessionColorId, parseIconSpec } from '../browser/appearance.ts'
+import { AppearanceIcon } from '../browser/appearance-icon.tsx'
+import { requestAppearance } from '../browser/appearance-request.ts'
 import { WorkspaceBrowser } from '../browser/rows/WorkspaceBrowser.tsx'
 import { de, en, es, fr, ja, pt, ru, zh } from '../browser/locales.ts'
 import { isTextScale, type TextScale } from '../browser/stores.ts'
@@ -37,12 +41,32 @@ const SLOT = 'sidebar.workspaces'
 
 type Dict = Record<string, string>
 type SlotEntry = { component: unknown; options?: { id?: string } }
+type Dispose = () => void
 type Slots = {
   entries(name: string): SlotEntry[]
   subscribe(name: string, fn: () => void): () => void
-  register(options: Record<string, unknown>, component: unknown): () => void
+  register(options: Record<string, unknown>, component: unknown): Dispose
+  inject(name: string, fn: () => undefined | Dispose | Iterable<Dispose>): void
 }
-type AnyCtx = { get(name: string): unknown; effect(fn: () => () => void, label: string): void }
+type LocaleService = { bind(namespace: string): Translate }
+/** One row of a shipped context menu; the shipped kinds are all this shape. */
+type MenuActionEntry = {
+  id: string
+  label: string
+  icon?: { key: string }
+  danger?: boolean
+  separatorBefore?: boolean
+  run: () => void
+}
+type ContextMenus = {
+  register(options: {
+    id: string
+    target: 'workspace'
+    order?: number
+    resolve: (owner: { workspaceId: string; displayTitle: string }) => readonly MenuActionEntry[]
+  }): Dispose
+}
+type AnyCtx = { get(name: string): unknown; effect(fn: () => Dispose, label: string): void }
 
 /* ------------------------------------------------------------------ *
  * Increment state: the fields the shipped store does not know about.
@@ -56,11 +80,40 @@ type Plus = {
   timeBucketExpansion: Record<string, boolean>
   textScale: TextScale
   showWorkspaceName: boolean
+  /** Workspace id to an `emoji:` / `icon:` spec; absent means the shipped folder glyph. */
+  workspaceIcons: Record<string, string>
+  /** Session id to a palette id; absent means no accent. */
+  sessionColors: Record<string, string>
 }
+
+/** Enough for every Workspace/Session one person is likely to decorate, and a hard stop for a corrupt store. */
+const MAX_APPEARANCE_ENTRIES = 400
 
 const PLUS_KEY = 'dsh.workspace.view.sidebar-view.v1'
 const PLUS_INIT: Plus = {
   timeMode: false, statusFilter: 'all', timeBucketExpansion: {}, textScale: 'normal', showWorkspaceName: false,
+  workspaceIcons: {}, sessionColors: {},
+}
+
+/**
+ * Keep only entries this build can still render: a dropped icon name or an
+ * unknown palette id degrades to the default look instead of an empty cell.
+ * @param raw - the stored record.
+ * @param valid - predicate for one stored value.
+ * @returns a fresh record, capped at {@link MAX_APPEARANCE_ENTRIES}.
+ */
+function readAppearanceRecord(raw: unknown, valid: (value: string) => boolean): Record<string, string> {
+  if (typeof raw !== 'object' || raw === null) return {}
+  const out: Record<string, string> = {}
+  let kept = 0
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (kept >= MAX_APPEARANCE_ENTRIES) break
+    if (typeof value === 'string' && valid(value)) {
+      out[key] = value
+      kept += 1
+    }
+  }
+  return out
 }
 
 function readPlus(): Plus {
@@ -76,6 +129,8 @@ function readPlus(): Plus {
         : {},
       textScale: isTextScale(parsed.textScale) ? parsed.textScale : PLUS_INIT.textScale,
       showWorkspaceName: parsed.showWorkspaceName === true,
+      workspaceIcons: readAppearanceRecord(parsed.workspaceIcons, value => parseIconSpec(value) !== null),
+      sessionColors: readAppearanceRecord(parsed.sessionColors, isSessionColorId),
     }
   } catch {
     return PLUS_INIT
@@ -107,6 +162,16 @@ const PICKED = [
   'statusTabs.label', 'statusTab.all', 'statusTab.running', 'statusTab.pending', 'statusTab.unread',
   'textSize.label', 'textSize.small', 'textSize.normal', 'textSize.large', 'viewOptions.showWorkspaceName',
   'empty.noMatches',
+  'appearance.workspaceIcon', 'appearance.sessionColor',
+  'appearance.icon.title', 'appearance.color.title', 'appearance.icon.hint', 'appearance.color.hint',
+  'appearance.tab.emoji', 'appearance.tab.icon', 'appearance.search', 'appearance.noMatches',
+  'appearance.reset', 'appearance.done', 'appearance.noColor',
+  'appearance.group.work', 'appearance.group.tech', 'appearance.group.nature', 'appearance.group.life',
+  'appearance.group.create', 'appearance.group.misc', 'appearance.group.animals', 'appearance.group.food',
+  'appearance.group.fun', 'appearance.group.symbols',
+  'appearance.color.red', 'appearance.color.orange', 'appearance.color.amber', 'appearance.color.green',
+  'appearance.color.teal', 'appearance.color.blue', 'appearance.color.violet', 'appearance.color.pink',
+  'appearance.color.gray',
 ]
 
 function pick(dict: Dict): Dict {
@@ -132,20 +197,66 @@ const LANG_BY_FLAT = new Map<string, Dict>(Object.entries(SHIPPED_FLAT).map(([la
 
 type Translate = (key: string, params?: Record<string, unknown>) => string
 
+/**
+ * Layer this plugin's dictionaries over the shipped translator. The shipped
+ * namespace renders in the same language as ours but carries none of our keys,
+ * so each lookup tries our dictionary first and falls back to the shipped one.
+ * @param shipped - translator bound to the shipped namespace.
+ * @returns a translator for the increment keys that never throws on a miss.
+ */
+function translateFor(shipped: Translate): Translate {
+  let dict: Dict = DICT_BY_LANG.zh
+  try {
+    dict = LANG_BY_FLAT.get(shipped('groupBy.flat')) ?? DICT_BY_LANG.zh
+  } catch {
+    dict = DICT_BY_LANG.zh
+  }
+  return (key: string, params?: Record<string, unknown>): string => {
+    const local = dict[key]
+    if (local !== undefined) return local
+    try { return shipped(key, params) } catch { return key }
+  }
+}
+
 function useCompositeT(shipped: Translate): Translate {
-  return React.useMemo(() => {
-    let dict: Dict = DICT_BY_LANG.zh
-    try {
-      const probe = shipped('groupBy.flat')
-      dict = LANG_BY_FLAT.get(probe) ?? DICT_BY_LANG.zh
-    } catch {
-      dict = DICT_BY_LANG.zh
-    }
-    return (key: string, params?: Record<string, unknown>): string => {
-      const local = dict[key]
-      return local !== undefined ? local : shipped(key, params)
-    }
-  }, [shipped])
+  return React.useMemo(() => translateFor(shipped), [shipped])
+}
+
+/* ------------------------------------------------------------------ *
+ * Menu contributions: the shipped Workspace and Session menus are the
+ * entry points, so we append one row to each instead of owning menus.
+ * ------------------------------------------------------------------ */
+
+/** The open-state pair a Session row menu passes to its entries. */
+type UseMenuOpenState = () => readonly [open: boolean, setOpen: (open: boolean) => void]
+
+type SessionColorItemProps = {
+  sessionId: string
+  displayTitle: string
+  useMenuOpenState: UseMenuOpenState
+}
+
+/** The palette glyph shared by the workspace and session menu rows. */
+function PaletteIcon(): React.ReactElement {
+  return React.createElement(AppearanceIcon, { spec: { kind: 'icon', value: 'palette' }, size: 16 })
+}
+
+/**
+ * "Set color" row appended to the shipped Session menu. The menu is still the
+ * shipped one; this row only requests the palette, dismissing first so the
+ * dialog is not mounted inside a popover that is closing.
+ * @param props - the row's Session identity and its menu's open state.
+ */
+function SessionColorMenuItem(props: SessionColorItemProps & { t: Translate }): React.ReactElement {
+  const { sessionId, displayTitle, t, useMenuOpenState } = props
+  const [, setMenuOpen] = useMenuOpenState()
+  return React.createElement(MenuItemButton, {
+    icon: React.createElement(PaletteIcon),
+    onSelect: () => {
+      setMenuOpen(false)
+      requestAppearance({ kind: 'session-color', sessionId, displayTitle })
+    },
+  }, t('appearance.sessionColor'))
 }
 
 /* ------------------------------------------------------------------ *
@@ -211,6 +322,8 @@ function Seat(props: AnyProps & { Shipped: React.ComponentType<AnyProps> }): Rea
     timeBucketExpansion: plus.timeBucketExpansion,
     textScale: plus.textScale,
     showWorkspaceName: plus.showWorkspaceName,
+    workspaceIcons: plus.workspaceIcons,
+    sessionColors: plus.sessionColors,
   }), [shippedState, plus])
   const snapRef = React.useRef(snapshot)
   snapRef.current = snapshot
@@ -234,6 +347,18 @@ function Seat(props: AnyProps & { Shipped: React.ComponentType<AnyProps> }): Rea
     },
     setTextScale: (scale: TextScale): void => setPlus({ textScale: scale }),
     setShowWorkspaceName: (show: boolean): void => setPlus({ showWorkspaceName: show }),
+    setWorkspaceIcon: (workspaceId: string, spec: string | null): void => {
+      const next = { ...plusState.workspaceIcons }
+      if (spec === null) delete next[workspaceId]
+      else next[workspaceId] = spec
+      setPlus({ workspaceIcons: next })
+    },
+    setSessionColor: (sessionId: string, color: string | null): void => {
+      const next = { ...plusState.sessionColors }
+      if (color === null) delete next[sessionId]
+      else next[sessionId] = color
+      setPlus({ sessionColors: next })
+    },
   }), [shippedActions])
   const t = useCompositeT(rest.t)
   return React.createElement(WorkspaceBrowser as unknown as React.ComponentType<Record<string, unknown>>, {
@@ -255,6 +380,43 @@ export function apply(ctx: AnyCtx): void {
     return
   }
   const seated = new Map<SlotEntry, unknown>()
+  const locale = ctx.get('locale') as LocaleService | undefined
+  const contextMenus = ctx.get('contextMenus') as ContextMenus | undefined
+  let t: Translate = translateFor(() => { throw new Error('shipped locale unavailable') })
+  try {
+    if (locale !== undefined) t = translateFor(locale.bind('workspace'))
+  } catch { /* keep the built-in dictionary when the namespace is not registered yet */ }
+
+  // The Workspace "..." menu is built by the shipped package, so we add one row
+  // to it (and its icon into the shared icon slot) instead of owning a menu.
+  if (contextMenus !== undefined) {
+    ctx.effect(() => contextMenus.register({
+      id: 'workspace.appearance', target: 'workspace', order: 150,
+      resolve: ({ workspaceId, displayTitle }) => [{
+        id: 'icon',
+        label: t('appearance.workspaceIcon'),
+        icon: { key: 'workspace.appearance' },
+        run: () => { requestAppearance({ kind: 'workspace-icon', workspaceId, displayTitle }) },
+      }],
+    }), 'dsh-sidebar-view: workspace icon menu action')
+  }
+  try {
+    slots.inject('contextMenu.icon', () => slots.register(
+      { name: 'contextMenu.icon', key: 'workspace.appearance' }, PaletteIcon,
+    ))
+  } catch (error) {
+    console.warn('[dsh-sidebar-view] shipped context-menu icon slot unavailable', error)
+  }
+  // The Session menu takes plain React entries; ours renders the shipped
+  // MenuItemButton so it inherits the menu's row metrics and focus handling.
+  try {
+    slots.inject('sidebar.workspaces.session.menu.item', () => slots.register(
+      { name: 'sidebar.workspaces.session.menu.item', id: 'dsh-sidebar-view-session-color', order: 250 },
+      (props: SessionColorItemProps) => React.createElement(SessionColorMenuItem, { ...props, t }),
+    ))
+  } catch (error) {
+    console.warn('[dsh-sidebar-view] shipped session menu slot unavailable', error)
+  }
 
   const forceRerender = (): void => {
     try {

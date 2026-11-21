@@ -153,6 +153,21 @@
   color: var(--dsw-alias-state-business-primary);
 }
 
+/* A user glyph is content, not chrome: give it the stronger label tone so a
+   line icon reads at 16px instead of fading into the row. Emoji ignore it. */
+.folderCustom {
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* Accent for a Session with no live status: same 16px cell, smaller dot so it
+   never competes with a real state dot beside it in the list. */
+.sessionColorDot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
 
 /* Project leading slot: folder by default, expand arrow on row hover. */
 .projectRow .chevron { display: none; }

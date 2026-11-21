@@ -24,6 +24,8 @@ import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import { abbreviateHomePath } from '@deepseek-ai/dsh-util-workspace-path'
 import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { WorkspaceBrowserProps } from '../contract/slots.ts'
+import { parseIconSpec, sessionColorHex } from '../appearance.ts'
+import { AppearanceIcon } from '../appearance-icon.tsx'
 import type { GroupNode, SearchResultNode, SessionNode } from '../tree.ts'
 import css from './Rows.module.css'
 
@@ -228,6 +230,12 @@ type ProjectRowItemProps = {
   drag?: WorkspaceRowDragProps | undefined
   /** Host account home; POSIX home-rooted hover paths display as `~`. */
   home?: string | undefined
+  /**
+   * The user's leading glyph for this Workspace, as an `emoji:` / `icon:`
+   * spec. Absent keeps the shipped open/closed folder, so the row never
+   * depends on the appearance store having an entry.
+   */
+  appearanceIcon?: string | undefined
   t: RowTranslate
 } & Pick<WorkspaceBrowserProps, 'useWorkspaceAccess' | 'renderFactorySlot' | 'useContextMenuTarget' | 'useContextMenu'>
 
@@ -279,7 +287,7 @@ function WorkspaceProjectRow({ workspaceId, ...props }: ProjectRowItemProps & { 
 
 function ProjectRow({
   group, containsCurrentDescendant = false, onToggle, drag: offeredDrag, home, newShortcut, t, actions,
-  renderFactorySlot, useContextMenuTarget, useContextMenu,
+  appearanceIcon, renderFactorySlot, useContextMenuTarget, useContextMenu,
 }: Omit<ProjectRowItemProps, 'onCreate'> & { actions: ProjectRowActions }) {
   const { getTriggerProps } = useContextMenu()
   const drag = actions.reorder ? offeredDrag : undefined
@@ -287,6 +295,8 @@ function ProjectRow({
   const row = group
   // The ungrouped bucket has no workspace title: its label is dictionary copy.
   const label = row.workspaceId === undefined ? t('group.ungrouped') : row.label
+  // Decode once per render: a dropped icon name degrades to the folder.
+  const leadingIcon = appearanceIcon === undefined ? undefined : parseIconSpec(appearanceIcon)
   const active = containsCurrentDescendant || (group.expanded && group.containsCurrent)
   const menuOpen = useContextMenuTarget(target => target?.kind === 'workspace' && target.value.workspaceId === row.workspaceId)
   const dragPreview = useRowDragPreview(css.dragPreview as string, DRAG_PREVIEW_PROPERTIES)
@@ -311,8 +321,10 @@ function ProjectRow({
         }}
       onDragEnd={() => { if (dragPreview.clear()) drag?.end() }}
     >
-      <span className={clsx(css.slot, css.folder, active && css.folderActive)}>
-        {row.expanded ? <IconFolderOpenRegular /> : <IconFolderCloseRegular />}
+      <span className={clsx(css.slot, css.folder, active && css.folderActive, leadingIcon !== undefined && css.folderCustom)}>
+        {leadingIcon !== undefined
+          ? <AppearanceIcon spec={leadingIcon} size={16} />
+          : row.expanded ? <IconFolderOpenRegular /> : <IconFolderCloseRegular />}
       </span>
       <span className={clsx(css.slot, css.chevron)}>
         <IconTriangleRightFillRegular className={clsx(css.arrow, row.expanded && css.arrowOpen)} />
@@ -633,7 +645,7 @@ export function SearchResultItem({
  */
 export function SessionNodeItem({
   node, currentId, now, onOpen, onRenameRequest, renderSlot, renderFactorySlot, useContextMenuTarget,
-  useContextMenu, onReveal, drag, home, useSessionAccess, t, workspaceLabel,
+  useContextMenu, onReveal, drag, home, useSessionAccess, t, workspaceLabel, color,
 }: {
   useContextMenu: WorkspaceBrowserProps['useContextMenu']
   renderFactorySlot: WorkspaceBrowserProps['renderFactorySlot']
@@ -656,6 +668,12 @@ export function SessionNodeItem({
    * Omitted when the view option is off, which is the default.
    */
   workspaceLabel?: string | undefined
+  /**
+   * The user's accent for this Session, as a palette id. It takes the leading
+   * 16px cell only while the row's primary state is idle: a live status dot
+   * outranks it, because activity is the more urgent signal.
+   */
+  color?: string | undefined
   t: RowTranslate
 } & Pick<WorkspaceBrowserProps, 'useSessionAccess'> & PropsRenderSlots<
   | 'sidebar.workspaces.session.row.action'
@@ -678,6 +696,7 @@ export function SessionNodeItem({
   const draggable = drag !== undefined && reorderable && !row.blank && !row.archived
   const menuOpen = useContextMenuTarget(target => target?.kind === 'session' && target.value.sessionId === node.id)
   const dragPreview = useRowDragPreview(css.dragPreview as string, DRAG_PREVIEW_PROPERTIES)
+  const accent = color === undefined ? undefined : sessionColorHex(color)
   const rowRef = useRef<HTMLDivElement>(null)
   const titleRef = useRef<HTMLSpanElement>(null)
   // On macOS the click that activates the window is not delivered, but the
@@ -752,7 +771,9 @@ export function SessionNodeItem({
       <span className={css.slot}>
         {!row.archived && !row.blank && (showStatus
           ? <SessionStatusDots statuses={statuses} />
-          : renderSlot('sidebar.session.row.leading', { sessionId: node.id }))}
+          : accent === undefined
+            ? renderSlot('sidebar.session.row.leading', { sessionId: node.id })
+            : <span className={css.sessionColorDot} style={{ backgroundColor: accent }} aria-hidden="true" />)}
       </span>
       <span
         ref={titleRef}

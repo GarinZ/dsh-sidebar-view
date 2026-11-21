@@ -18,6 +18,7 @@ import {
   Fragment, type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useRef, useState,
 } from 'react'
 import clsx from 'clsx'
+import { AppearanceDialogs } from './AppearanceDialogs.tsx'
 import { WorkspaceDialogs } from './WorkspaceDialogs.tsx'
 import {
   AnimatedRows, HoverCardGroup, IconArchiveCheckOutlineRegular, IconArchiveOffOutlineRegular, IconArchiveOutlineRegular,
@@ -53,6 +54,12 @@ import css from './WorkspaceBrowser.module.css'
  * focus() forces a synchronous layout and would jank the slide.
  */
 const EXPAND_SLIDE_MS = 300
+/**
+ * Stable empty maps for the appearance selectors: a fresh object per render
+ * would break every equality check downstream, and most users decorate nothing.
+ */
+const NO_APPEARANCE: Readonly<Record<string, string>> = {}
+
 /** Pause between the latest keystroke and a Host content-search request. */
 const SEARCH_DEBOUNCE_MS = 250
 /** `session.search` wire bound, measured in JavaScript UTF-16 code units. */
@@ -347,6 +354,10 @@ type SessionTreeProps = Pick<
   revealSessionId?: SessionId | undefined
   /** Acknowledge that the chosen Session row has been revealed. */
   onSessionRevealed: (sessionId: SessionId) => void
+  /** Stored icon specs by Workspace id; absent until someone sets one. */
+  workspaceIcons?: Readonly<Record<string, string>> | undefined
+  /** Stored accent palette ids by Session; absent until someone sets one. */
+  sessionColors?: Readonly<Record<string, string>> | undefined
 }
 
 /** The list-empty placeholder — a glyph over the text; a narrowed view names which filter emptied it. */
@@ -380,6 +391,7 @@ function SessionTree({
   nestWorkspaces, groupExpansion, setGroupExpanded, statusFilter,
   setSessionOrder, home, t,
   revealSessionId, onSessionRevealed, shortcuts,
+  workspaceIcons, sessionColors,
 }: SessionTreeProps) {
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
   const statuses = useSessionStatus(s => s)
@@ -617,6 +629,7 @@ function SessionTree({
           renderFactorySlot={renderFactorySlot} useContextMenu={useContextMenu} useContextMenuTarget={useContextMenuTarget}
           useWorkspaceAccess={useWorkspaceAccess}
           containsCurrentDescendant={currentAncestors.has(group.key)}
+          appearanceIcon={group.workspaceId === undefined ? undefined : (workspaceIcons ?? NO_APPEARANCE)[group.workspaceId]}
           home={home}
           t={t}
           onToggle={() => {
@@ -683,6 +696,7 @@ function SessionTree({
               home={home}
               useSessionAccess={useSessionAccess}
               t={t}
+              color={(sessionColors ?? NO_APPEARANCE)[node.id]}
             />
           )
         })}
@@ -737,7 +751,7 @@ function SessionTree({
 /** The flat "In one list" body: every session is one draggable top-level row. */
 function FlatList({
   list, sessionIds, rowState, onLeaveArchivedOnly, useSessionStatus, useSessionAccess, open, onSessionRenameRequest,
-  usePanelInfo, setSessionOrder, workspaceReady, animationResetKey, statusFilter, workspaceLabelOf,
+  usePanelInfo, setSessionOrder, workspaceReady, animationResetKey, statusFilter, workspaceLabelOf, sessionColors,
   revealSessionId, onSessionRevealed, renderSlot, renderFactorySlot, useContextMenuTarget, useContextMenu, home, t,
 }: Pick<
   SessionTreeProps,
@@ -763,6 +777,8 @@ function FlatList({
   sessionIds: readonly SessionId[]
   /** Workspace name per Session; absent while the option is off. */
   workspaceLabelOf?: ((id: SessionId) => string | undefined) | undefined
+  /** Accent palette id per Session; empty while the user set no color. */
+  sessionColors?: Readonly<Record<string, string>> | undefined
 }) {
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
   const statuses = useSessionStatus(s => s)
@@ -814,6 +830,7 @@ function FlatList({
               useContextMenu={useContextMenu}
               useContextMenuTarget={useContextMenuTarget}
               workspaceLabel={workspaceLabelOf?.(node.id)}
+              color={(sessionColors ?? NO_APPEARANCE)[node.id]}
               onReveal={node.id === revealSessionId
                 ? () => { onSessionRevealed(node.id) }
                 : undefined}
@@ -856,7 +873,7 @@ function FlatList({
  * card. Buckets fold from their own header.
  */
 function TimeGroups({
-  list, sessionIds, rowState, statusFilter, bucketExpansion, onToggleBucket, workspaceLabelOf,
+  list, sessionIds, rowState, statusFilter, bucketExpansion, onToggleBucket, workspaceLabelOf, sessionColors,
   onLeaveArchivedOnly, useSessionStatus, useSessionAccess, open, onSessionRenameRequest,
   usePanelInfo, workspaceReady, animationResetKey, revealSessionId, onSessionRevealed,
   renderSlot, renderFactorySlot, useContextMenuTarget, useContextMenu, home, t, setSessionOrder,
@@ -882,6 +899,8 @@ function TimeGroups({
   sessionIds: readonly SessionId[]
   /** Workspace name per Session; absent while the option is off. */
   workspaceLabelOf?: ((id: SessionId) => string | undefined) | undefined
+  /** Accent palette id per Session; empty while the user set no color. */
+  sessionColors?: Readonly<Record<string, string>> | undefined
   rowState: SessionRowState
   statusFilter: SessionStatusFilter
   /** Folded buckets by key; an absent key stays open. */
@@ -971,6 +990,7 @@ function TimeGroups({
                   useContextMenu={useContextMenu}
                   useContextMenuTarget={useContextMenuTarget}
                   workspaceLabel={workspaceLabelOf?.(node.id)}
+                  color={(sessionColors ?? NO_APPEARANCE)[node.id]}
                   onReveal={node.id === revealSessionId ? () => { onSessionRevealed(node.id) } : undefined}
                   useSessionAccess={useSessionAccess}
                   drag={{
@@ -1220,6 +1240,14 @@ export function WorkspaceBrowser({
   const timeBucketExpansion = useStore(s => s.timeBucketExpansion ?? {})
   const textScale = useStore(s => s.textScale ?? 'normal')
   const showWorkspaceName = useStore(s => s.showWorkspaceName === true)
+  const workspaceIcons = useStore(s => (s.workspaceIcons ?? NO_APPEARANCE) as Readonly<Record<string, string>>)
+  const sessionColors = useStore(s => (s.sessionColors ?? NO_APPEARANCE) as Readonly<Record<string, string>>)
+  // The appearance actions are this plugin's own spin on the shipped action
+  // bag, so they arrive past the shipped component's type.
+  const appearanceActions = actions as unknown as {
+    setWorkspaceIcon?: (workspaceId: string, spec: string | null) => void
+    setSessionColor?: (sessionId: string, color: string | null) => void
+  }
   const groupExpansion = useStore(s => s.groupExpansion)
   const sessionOrderByAccount = useStore(s => s.sessionOrderByAccount)
   // Archived sessions are not openable: the row stays visible under the
@@ -1691,6 +1719,7 @@ export function WorkspaceBrowser({
                 rowState={rowState}
                 statusFilter={statusFilter}
                 workspaceLabelOf={workspaceLabelOf}
+                sessionColors={sessionColors}
                 bucketExpansion={timeBucketExpansion}
                 onToggleBucket={actions.setTimeBucketExpanded}
                 onLeaveArchivedOnly={leaveArchivedOnly}
@@ -1719,6 +1748,7 @@ export function WorkspaceBrowser({
                   rowState={rowState}
                   statusFilter={statusFilter}
                   workspaceLabelOf={workspaceLabelOf}
+                  sessionColors={sessionColors}
                   onLeaveArchivedOnly={leaveArchivedOnly}
                   workspaceReady={workspaceReady}
                   animationResetKey={`${groupBy}/${orderBy}/${archivedFilter}/${statusFilter}`}
@@ -1750,6 +1780,8 @@ export function WorkspaceBrowser({
                   workspaces={orderedWorkspaces}
                   ungroupedSessionIds={orderedUngroupedSessionIds}
                   workspaceReady={workspaceReady}
+                  workspaceIcons={workspaceIcons}
+                  sessionColors={sessionColors}
                   nestWorkspaces={groupBy === 'workspace-tree'}
                   animationResetKey={`${groupBy}/${orderBy}/${archivedFilter}/${statusFilter}`}
                   statusFilter={statusFilter}
@@ -1772,6 +1804,14 @@ export function WorkspaceBrowser({
       {workspaceActionRequest !== null && <WorkspaceDialogs key={`${workspaceActionRequest.action}/${workspaceActionRequest.workspaceId}`}
         request={workspaceActionRequest} workspaces={workspaces} renameWorkspace={renameWorkspace} deleteWorkspace={deleteWorkspace}
         settleWorkspaceAction={settleWorkspaceAction} t={t} />}
+
+      <AppearanceDialogs
+        t={t}
+        workspaceIcons={workspaceIcons}
+        sessionColors={sessionColors}
+        onWorkspaceIcon={(workspaceId, spec) => { appearanceActions.setWorkspaceIcon?.(workspaceId, spec) }}
+        onSessionColor={(sessionId, color) => { appearanceActions.setSessionColor?.(sessionId, color) }}
+      />
     </div>
   )
 }
