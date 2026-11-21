@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({id:"dsh-sidebar-view",factory:require=>{var module={exports:{}};var exports=module.exports;
-;try{console.info('[dsh-sidebar-view] build 2026-11-21T07:18:52.091Z')}catch(e){}
+;try{console.info('[dsh-sidebar-view] build 2026-11-21T07:27:13.784Z')}catch(e){}
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -679,11 +679,23 @@ function AppearanceDialogs(props) {
   };
   return request.kind === "workspace-icon" ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(WorkspaceIconPicker, { request, close, ...props }, request.workspaceId) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(SessionColorPicker, { request, close, ...props }, request.sessionId);
 }
+function rowKeyOf(request) {
+  return request.kind === "workspace-icon" ? `workspace:${request.workspaceId}` : `session:${request.sessionId}`;
+}
+function rowRectOf(key) {
+  const row = document.querySelector(`[data-row-key="${CSS.escape(key)}"]`);
+  if (row === null) return null;
+  const rect = row.getBoundingClientRect();
+  return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+}
 function PickerPopover({ request, title, close, children }) {
   const panelRef = React.useRef(null);
   const [position, setPosition] = React.useState(null);
   const closeRef = React.useRef(close);
   closeRef.current = close;
+  const placeRef = React.useRef(() => {
+  });
+  const rowKey = rowKeyOf(request);
   React.useLayoutEffect(() => {
     const panel = panelRef.current;
     if (panel === null) return;
@@ -692,7 +704,12 @@ function PickerPopover({ request, title, close, children }) {
       const height = panel.offsetHeight;
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
-      const anchor = request.anchor;
+      const live = rowRectOf(rowKey);
+      if (live === null && request.anchor === void 0) {
+        closeRef.current();
+        return;
+      }
+      const anchor = live ?? request.anchor;
       let left = anchor === void 0 ? viewportWidth / 2 - width / 2 : anchor.right + ANCHOR_GAP;
       let top = anchor === void 0 ? viewportHeight / 3 : anchor.top;
       if (left + width > viewportWidth - VIEWPORT_MARGIN) {
@@ -700,15 +717,16 @@ function PickerPopover({ request, title, close, children }) {
       }
       left = Math.max(VIEWPORT_MARGIN, Math.min(left, viewportWidth - width - VIEWPORT_MARGIN));
       top = Math.max(VIEWPORT_MARGIN, Math.min(top, viewportHeight - height - VIEWPORT_MARGIN));
-      setPosition({ left, top });
+      setPosition((previous) => previous !== null && previous.left === left && previous.top === top ? previous : { left, top });
     };
+    placeRef.current = place;
     place();
     const observer = new ResizeObserver(place);
     observer.observe(panel);
     return () => {
       observer.disconnect();
     };
-  }, [request]);
+  }, [request, rowKey]);
   React.useEffect(() => {
     panelRef.current?.focus();
     const onPointerDown = (event) => {
@@ -720,14 +738,18 @@ function PickerPopover({ request, title, close, children }) {
       event.stopPropagation();
       closeRef.current();
     };
+    const onScroll = () => {
+      placeRef.current();
+    };
     document.addEventListener("pointerdown", onPointerDown, true);
     document.addEventListener("keydown", onKeyDown, true);
-    window.addEventListener("scroll", () => {
-      closeRef.current();
-    }, true);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onScroll);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown, true);
       document.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onScroll);
     };
   }, []);
   return (0, import_react_dom.createPortal)(

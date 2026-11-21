@@ -53,9 +53,29 @@ export function AppearanceDialogs(props: AppearanceDialogsProps) {
 }
 
 /**
- * A fixed panel beside the anchor row, kept inside the viewport and flipped to
- * the row's other side when the right edge would overflow. Height changes (tab
- * switches, search results) re-place it through a resize observer.
+ * The row the panel sits beside. Its key mirrors the entity in the request, so
+ * the panel can follow the row when the list scrolls instead of guessing from
+ * a rect sampled once at open time.
+ */
+function rowKeyOf(request: AppearanceRequest): string {
+  return request.kind === 'workspace-icon' ? `workspace:${request.workspaceId}` : `session:${request.sessionId}`
+}
+
+/** @param key - the row's data-row-key. @returns its viewport rect, or null when unmounted. */
+function rowRectOf(key: string): AppearanceAnchor | null {
+  const row = document.querySelector(`[data-row-key="${CSS.escape(key)}"]`)
+  if (row === null) return null
+  const rect = row.getBoundingClientRect()
+  return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }
+}
+
+/**
+ * A fixed panel beside the anchor row: kept inside the viewport, flipped to the
+ * row's other side when the right edge would overflow, and re-placed whenever
+ * the row moves (list scroll, hover-driven list scrolling) or its own height
+ * changes (tab switches, search results). It closes when the row itself is gone
+ * — not on scroll, because the host list does scroll on its own while the
+ * pointer moves, which used to dismiss the panel for no visible reason.
  */
 function PickerPopover({ request, title, close, children }: {
   request: AppearanceRequest
@@ -67,6 +87,8 @@ function PickerPopover({ request, title, close, children }: {
   const [position, setPosition] = React.useState<{ left: number; top: number } | null>(null)
   const closeRef = React.useRef(close)
   closeRef.current = close
+  const placeRef = React.useRef<() => void>(() => {})
+  const rowKey = rowKeyOf(request)
 
   React.useLayoutEffect(() => {
     const panel = panelRef.current
@@ -76,7 +98,12 @@ function PickerPopover({ request, title, close, children }: {
       const height = panel.offsetHeight
       const viewportWidth = window.innerWidth
       const viewportHeight = window.innerHeight
-      const anchor = request.anchor
+      const live = rowRectOf(rowKey)
+      if (live === null && request.anchor === undefined) {
+        closeRef.current()
+        return
+      }
+      const anchor = live ?? request.anchor
       let left = anchor === undefined ? viewportWidth / 2 - width / 2 : anchor.right + ANCHOR_GAP
       let top = anchor === undefined ? viewportHeight / 3 : anchor.top
       if (left + width > viewportWidth - VIEWPORT_MARGIN) {
@@ -84,13 +111,14 @@ function PickerPopover({ request, title, close, children }: {
       }
       left = Math.max(VIEWPORT_MARGIN, Math.min(left, viewportWidth - width - VIEWPORT_MARGIN))
       top = Math.max(VIEWPORT_MARGIN, Math.min(top, viewportHeight - height - VIEWPORT_MARGIN))
-      setPosition({ left, top })
+      setPosition((previous) => previous !== null && previous.left === left && previous.top === top ? previous : { left, top })
     }
+    placeRef.current = place
     place()
     const observer = new ResizeObserver(place)
     observer.observe(panel)
     return () => { observer.disconnect() }
-  }, [request])
+  }, [request, rowKey])
 
   React.useEffect(() => {
     panelRef.current?.focus()
@@ -103,12 +131,19 @@ function PickerPopover({ request, title, close, children }: {
       event.stopPropagation()
       closeRef.current()
     }
+    // Reposition synchronously: the row's marquee scrolls its title on hover,
+    // and animation frames can be throttled in background windows, so a frame
+    // callback would keep the panel pinned to the row's old rect.
+    const onScroll = (): void => { placeRef.current() }
     document.addEventListener('pointerdown', onPointerDown, true)
     document.addEventListener('keydown', onKeyDown, true)
-    window.addEventListener('scroll', () => { closeRef.current() }, true)
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', onScroll)
     return () => {
       document.removeEventListener('pointerdown', onPointerDown, true)
       document.removeEventListener('keydown', onKeyDown, true)
+      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', onScroll)
     }
   }, [])
 
