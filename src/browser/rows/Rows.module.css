@@ -159,51 +159,27 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
-/* Tag marker: the tag colour is the dot, and a live status wraps around it as
-   a ring, so activity never hides which tag a Session wears. */
-.tagMarker {
+/* A tagged row is the positioning context for its tab; untagged rows keep the
+   drop indicators anchored to the group, as before. */
+.sessionRow.tagged {
   position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
 }
 
-.tagMarkerDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.tagMarkerRing {
+/* Tag tab: a short colour bar in the leading gutter, 7px before the content
+   start so it rides the tree indent instead of pinning to the row box. It
+   never replaces the status cell — an unread dot keeps its own lane. */
+.tagTab {
   position: absolute;
-  inset: 1px;
-  border: 1.5px solid var(--dsw-alias-state-idle-primary);
-  border-radius: 50%;
-}
-
-.tagMarker[data-state='done'] .tagMarkerRing {
-  border-color: var(--dsw-alias-state-success-primary);
-}
-
-.tagMarker[data-state='warning'] .tagMarkerRing {
-  border-color: var(--dsw-alias-state-warn-primary);
-}
-
-.tagMarker[data-state='error'] .tagMarkerRing {
-  border-color: var(--dsw-alias-state-error-primary);
-}
-
-/* Running: an open arc spins instead of a solid ring. */
-.tagMarker[data-state='ongoing'] .tagMarkerRing {
-  border-color: var(--dsw-alias-label-tertiary);
-  border-right-color: transparent;
-  animation: tagMarkerSpin 1.5s linear infinite;
-}
-
-@keyframes tagMarkerSpin {
-  to { transform: rotate(360deg); }
+  inset-block-start: 50%;
+  inset-inline-start: calc(
+    var(--dsh-sidebar-row-padding) - var(--dsh-sidebar-paint-inset)
+    + var(--dsh-workspace-indent, 0px) - 7px
+  );
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
 /* Tag group headers repeat the tag's colour beside the bucket name. */
@@ -506,6 +482,23 @@
   word-break: break-all;
 }
 
+/* The tag line repeats the row tab's hue so colour and name meet on the card. */
+.hoverTag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--dsw-alias-hovercard-label-secondary);
+}
+
+.hoverTagDot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
 .hoverTime {
   font-size: 12px;
   line-height: 16px;
@@ -575,10 +568,5 @@
   .arrow {
     animation: none;
     transition: none;
-  }
-
-  .tagMarker[data-state='ongoing'] .tagMarkerRing {
-    animation: none;
-    border-right-color: var(--dsw-alias-label-tertiary);
   }
 }

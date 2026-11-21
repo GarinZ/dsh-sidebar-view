@@ -63,6 +63,7 @@ const EXPAND_SLIDE_MS = 300
 const NO_APPEARANCE: Readonly<Record<string, string>> = {}
 /** Stable empty tag list and fold map, for the same reason. */
 const NO_TAGS: readonly TagDefinition[] = []
+const NO_TAGS_BY_SESSION: Readonly<Record<string, TagDefinition>> = {}
 const NO_FOLDS: Readonly<Record<string, boolean>> = {}
 
 /** Pause between the latest keystroke and a Host content-search request. */
@@ -362,8 +363,8 @@ type SessionTreeProps = Pick<
   onSessionRevealed: (sessionId: SessionId) => void
   /** Stored icon specs by Workspace id; absent until someone sets one. */
   workspaceIcons?: Readonly<Record<string, string>> | undefined
-  /** Stored accent palette ids by Session; absent until someone sets one. */
-  sessionColors?: Readonly<Record<string, string>> | undefined
+  /** Tag worn by each Session; absent while the Session wears none. */
+  tagsBySession?: Readonly<Record<string, TagDefinition>> | undefined
 }
 
 /** The list-empty placeholder — a glyph over the text; a narrowed view names which filter emptied it. */
@@ -397,7 +398,7 @@ function SessionTree({
   nestWorkspaces, groupExpansion, setGroupExpanded, statusFilter,
   setSessionOrder, home, t,
   revealSessionId, onSessionRevealed, shortcuts,
-  workspaceIcons, sessionColors,
+  workspaceIcons, tagsBySession,
 }: SessionTreeProps) {
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
   const statuses = useSessionStatus(s => s)
@@ -702,7 +703,7 @@ function SessionTree({
               home={home}
               useSessionAccess={useSessionAccess}
               t={t}
-              color={(sessionColors ?? NO_APPEARANCE)[node.id]}
+              tag={(tagsBySession ?? NO_TAGS_BY_SESSION)[node.id]}
             />
           )
         })}
@@ -757,7 +758,7 @@ function SessionTree({
 /** The flat "In one list" body: every session is one draggable top-level row. */
 function FlatList({
   list, sessionIds, rowState, onLeaveArchivedOnly, useSessionStatus, useSessionAccess, open, onSessionRenameRequest,
-  usePanelInfo, setSessionOrder, workspaceReady, animationResetKey, statusFilter, workspaceLabelOf, sessionColors,
+  usePanelInfo, setSessionOrder, workspaceReady, animationResetKey, statusFilter, workspaceLabelOf, tagsBySession,
   revealSessionId, onSessionRevealed, renderSlot, renderFactorySlot, useContextMenuTarget, useContextMenu, home, t,
 }: Pick<
   SessionTreeProps,
@@ -783,8 +784,8 @@ function FlatList({
   sessionIds: readonly SessionId[]
   /** Workspace name per Session; absent while the option is off. */
   workspaceLabelOf?: ((id: SessionId) => string | undefined) | undefined
-  /** Accent palette id per Session; empty while the user set no color. */
-  sessionColors?: Readonly<Record<string, string>> | undefined
+  /** Tag worn by each Session; absent while the Session wears none. */
+  tagsBySession?: Readonly<Record<string, TagDefinition>> | undefined
 }) {
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
   const statuses = useSessionStatus(s => s)
@@ -836,7 +837,7 @@ function FlatList({
               useContextMenu={useContextMenu}
               useContextMenuTarget={useContextMenuTarget}
               workspaceLabel={workspaceLabelOf?.(node.id)}
-              color={(sessionColors ?? NO_APPEARANCE)[node.id]}
+              tag={(tagsBySession ?? NO_TAGS_BY_SESSION)[node.id]}
               onReveal={node.id === revealSessionId
                 ? () => { onSessionRevealed(node.id) }
                 : undefined}
@@ -879,7 +880,7 @@ function FlatList({
  * card. Buckets fold from their own header.
  */
 function TimeGroups({
-  list, sessionIds, rowState, statusFilter, bucketExpansion, onToggleBucket, workspaceLabelOf, sessionColors,
+  list, sessionIds, rowState, statusFilter, bucketExpansion, onToggleBucket, workspaceLabelOf, tagsBySession,
   onLeaveArchivedOnly, useSessionStatus, useSessionAccess, open, onSessionRenameRequest,
   usePanelInfo, workspaceReady, animationResetKey, revealSessionId, onSessionRevealed,
   renderSlot, renderFactorySlot, useContextMenuTarget, useContextMenu, home, t, setSessionOrder,
@@ -905,8 +906,8 @@ function TimeGroups({
   sessionIds: readonly SessionId[]
   /** Workspace name per Session; absent while the option is off. */
   workspaceLabelOf?: ((id: SessionId) => string | undefined) | undefined
-  /** Accent palette id per Session; empty while the user set no color. */
-  sessionColors?: Readonly<Record<string, string>> | undefined
+  /** Tag worn by each Session; absent while the Session wears none. */
+  tagsBySession?: Readonly<Record<string, TagDefinition>> | undefined
   rowState: SessionRowState
   statusFilter: SessionStatusFilter
   /** Folded buckets by key; an absent key stays open. */
@@ -996,7 +997,7 @@ function TimeGroups({
                   useContextMenu={useContextMenu}
                   useContextMenuTarget={useContextMenuTarget}
                   workspaceLabel={workspaceLabelOf?.(node.id)}
-                  color={(sessionColors ?? NO_APPEARANCE)[node.id]}
+                  tag={(tagsBySession ?? NO_TAGS_BY_SESSION)[node.id]}
                   onReveal={node.id === revealSessionId ? () => { onSessionRevealed(node.id) } : undefined}
                   useSessionAccess={useSessionAccess}
                   drag={{
@@ -1366,17 +1367,17 @@ export function WorkspaceBrowser({
   const tags = useStore(s => (s.tags ?? NO_TAGS) as readonly TagDefinition[])
   const sessionTags = useStore(s => (s.sessionTags ?? NO_APPEARANCE) as Readonly<Record<string, string>>)
   const tagExpansion = useStore(s => (s.tagExpansion ?? NO_FOLDS) as Readonly<Record<string, boolean>>)
-  // Rows still take a palette id, so resolve each Session's tag colour once
-  // instead of threading tags through every list component.
-  const sessionColors = useMemo<Readonly<Record<string, string>>>(() => {
-    if (tags.length === 0) return NO_APPEARANCE
-    const colorByTag = new Map(tags.map(tag => [tag.id, tag.color]))
-    const colors: Record<string, string> = {}
+  // Rows take the tag itself, so the leading tab and the hover-card label
+  // resolve once here instead of threading the tag list through every list.
+  const tagsBySession = useMemo<Readonly<Record<string, TagDefinition>>>(() => {
+    if (tags.length === 0) return NO_TAGS_BY_SESSION
+    const byId = new Map(tags.map(tag => [tag.id, tag]))
+    const lookup: Record<string, TagDefinition> = {}
     for (const [sessionId, tagId] of Object.entries(sessionTags)) {
-      const color = colorByTag.get(tagId)
-      if (color !== undefined) colors[sessionId] = color
+      const tag = byId.get(tagId)
+      if (tag !== undefined) lookup[sessionId] = tag
     }
-    return colors
+    return lookup
   }, [sessionTags, tags])
   // The appearance actions are this plugin's own spin on the shipped action
   // bag, so they arrive past the shipped component's type.
@@ -1858,7 +1859,7 @@ export function WorkspaceBrowser({
                 rowState={rowState}
                 statusFilter={statusFilter}
                 workspaceLabelOf={workspaceLabelOf}
-                sessionColors={sessionColors}
+                tagsBySession={tagsBySession}
                 bucketExpansion={timeBucketExpansion}
                 onToggleBucket={actions.setTimeBucketExpanded}
                 onLeaveArchivedOnly={leaveArchivedOnly}
@@ -1916,7 +1917,7 @@ export function WorkspaceBrowser({
                   rowState={rowState}
                   statusFilter={statusFilter}
                   workspaceLabelOf={workspaceLabelOf}
-                  sessionColors={sessionColors}
+                  tagsBySession={tagsBySession}
                   onLeaveArchivedOnly={leaveArchivedOnly}
                   workspaceReady={workspaceReady}
                   animationResetKey={`${groupBy}/${orderBy}/${archivedFilter}/${statusFilter}`}
@@ -1949,7 +1950,7 @@ export function WorkspaceBrowser({
                   ungroupedSessionIds={orderedUngroupedSessionIds}
                   workspaceReady={workspaceReady}
                   workspaceIcons={workspaceIcons}
-                  sessionColors={sessionColors}
+                  tagsBySession={tagsBySession}
                   nestWorkspaces={groupBy === 'workspace-tree'}
                   animationResetKey={`${groupBy}/${orderBy}/${archivedFilter}/${statusFilter}`}
                   statusFilter={statusFilter}
