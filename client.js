@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({id:"dsh-sidebar-view",factory:require=>{var module={exports:{}};var exports=module.exports;
-;try{console.info('[dsh-sidebar-view] build 2026-11-21T07:27:13.784Z')}catch(e){}
+;try{console.info('[dsh-sidebar-view] build 2026-11-21T07:56:30.873Z')}catch(e){}
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -555,6 +555,24 @@ function isSessionColorId(raw) {
 function sessionColorHex(raw) {
   return SESSION_COLORS.find((color) => color.id === raw)?.hex;
 }
+var MAX_TAG_NAME = 24;
+var MAX_TAGS = 100;
+var MAX_TAG_ID = 64;
+function readTagDefinitions(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const entry of raw) {
+    if (out.length >= MAX_TAGS) break;
+    if (typeof entry !== "object" || entry === null) continue;
+    const { id, name: name2, color } = entry;
+    if (typeof id !== "string" || id === "" || id.length > MAX_TAG_ID || seen.has(id)) continue;
+    if (!isSessionColorId(color)) continue;
+    seen.add(id);
+    out.push({ id, name: typeof name2 === "string" ? name2.slice(0, MAX_TAG_NAME) : "", color });
+  }
+  return out;
+}
 function searchIcons(query) {
   const needle = query.trim().toLowerCase();
   if (needle === "") return [];
@@ -662,9 +680,14 @@ var AppearanceDialogs_default = {
   swatchButton: "AppearanceDialogs_swatchButton",
   swatch: "AppearanceDialogs_swatch",
   swatchOn: "AppearanceDialogs_swatchOn",
-  clearRow: "AppearanceDialogs_clearRow",
-  clearRowOn: "AppearanceDialogs_clearRowOn",
-  plainDot: "AppearanceDialogs_plainDot"
+  tagList: "AppearanceDialogs_tagList",
+  tagChip: "AppearanceDialogs_tagChip",
+  tagChipOn: "AppearanceDialogs_tagChipOn",
+  tagChipDot: "AppearanceDialogs_tagChipDot",
+  tagChipLabel: "AppearanceDialogs_tagChipLabel",
+  nameRow: "AppearanceDialogs_nameRow",
+  nameLabel: "AppearanceDialogs_nameLabel",
+  nameInput: "AppearanceDialogs_nameInput"
 };
 
 // src/browser/rows/AppearanceDialogs.tsx
@@ -677,10 +700,13 @@ function AppearanceDialogs(props) {
   const close = () => {
     requestAppearance(null);
   };
-  return request.kind === "workspace-icon" ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(WorkspaceIconPicker, { request, close, ...props }, request.workspaceId) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(SessionColorPicker, { request, close, ...props }, request.sessionId);
+  return request.kind === "workspace-icon" ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(WorkspaceIconPicker, { request, close, ...props }, request.workspaceId) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(SessionTagPicker, { request, close, ...props }, request.sessionId);
 }
 function rowKeyOf(request) {
   return request.kind === "workspace-icon" ? `workspace:${request.workspaceId}` : `session:${request.sessionId}`;
+}
+function tagName(tag, t) {
+  return tag.name.trim() === "" ? t("appearance.color." + tag.color) : tag.name;
 }
 function rowRectOf(key) {
   const row = document.querySelector(`[data-row-key="${CSS.escape(key)}"]`);
@@ -880,18 +906,66 @@ function WorkspaceIconPicker({ request, close, t, workspaceIcons, onWorkspaceIco
     ] })
   ] });
 }
-function SessionColorPicker({ request, close, t, sessionColors, onSessionColor }) {
-  const current2 = sessionColors[request.sessionId];
-  const hex = sessionColorHex(current2);
-  const choose = (color) => {
-    onSessionColor(request.sessionId, color);
+function SessionTagPicker({ request, close, t, tags, sessionTags, onAssignTag, onCreateTag, onUpdateTag }) {
+  const currentId = sessionTags[request.sessionId];
+  const current2 = currentId === void 0 ? void 0 : tags.find((tag) => tag.id === currentId);
+  const [mode, setMode] = React.useState(current2 === void 0 ? "create" : "edit");
+  const [name2, setName] = React.useState(current2?.name ?? "");
+  const [color, setColor] = React.useState(current2?.color ?? "blue");
+  const editing = mode === "edit" && current2 !== void 0;
+  const assign = (tag) => {
+    onAssignTag(request.sessionId, tag.id);
+    close();
+  };
+  const startCreate = () => {
+    setMode("create");
+    setName("");
+  };
+  const pickColor = (id) => {
+    setColor(id);
+    if (current2 !== void 0 && mode === "edit") onUpdateTag(current2.id, current2.name, id);
+  };
+  const commit = () => {
+    const trimmed = name2.trim();
+    if (current2 !== void 0 && mode === "edit") onUpdateTag(current2.id, trimmed, color);
+    else onCreateTag(request.sessionId, trimmed, color);
+    close();
+  };
+  const clear = () => {
+    onAssignTag(request.sessionId, null);
     close();
   };
   return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(PickerPopover, { request, title: t("appearance.color.title"), close, children: [
     /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Head, { title: t("appearance.color.title"), scope: request.displayTitle }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: AppearanceDialogs_default.swatches, children: SESSION_COLORS.map((color) => {
-      const on = current2 === color.id;
-      const label = t("appearance.color." + color.id);
+    tags.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: AppearanceDialogs_default.tagList, role: "group", "aria-label": t("appearance.color.title"), children: [
+      tags.map((tag) => {
+        const on = tag.id === currentId;
+        return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
+          "button",
+          {
+            type: "button",
+            className: clsx_default(AppearanceDialogs_default.tagChip, on && AppearanceDialogs_default.tagChipOn),
+            "aria-pressed": on,
+            title: tagName(tag, t),
+            onClick: () => {
+              assign(tag);
+            },
+            children: [
+              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: AppearanceDialogs_default.tagChipDot, style: { backgroundColor: sessionColorHex(tag.color) }, "aria-hidden": true }),
+              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: AppearanceDialogs_default.tagChipLabel, children: tagName(tag, t) })
+            ]
+          },
+          tag.id
+        );
+      }),
+      editing && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("button", { type: "button", className: AppearanceDialogs_default.tagChip, onClick: startCreate, children: [
+        "+ ",
+        t("appearance.tag.new")
+      ] })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: AppearanceDialogs_default.swatches, children: SESSION_COLORS.map((option) => {
+      const on = color === option.id;
+      const label = t("appearance.color." + option.id);
       return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
         "button",
         {
@@ -901,28 +975,40 @@ function SessionColorPicker({ request, close, t, sessionColors, onSessionColor }
           "aria-label": label,
           title: label,
           onClick: () => {
-            choose(color.id);
+            pickColor(option.id);
           },
-          children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: AppearanceDialogs_default.swatch, style: { backgroundColor: color.hex }, "aria-hidden": true })
+          children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: AppearanceDialogs_default.swatch, style: { backgroundColor: option.hex }, "aria-hidden": true })
         },
-        color.id
+        option.id
       );
     }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
-      "button",
-      {
-        type: "button",
-        className: clsx_default(AppearanceDialogs_default.clearRow, hex === void 0 && AppearanceDialogs_default.clearRowOn),
-        "aria-pressed": hex === void 0,
-        onClick: () => {
-          choose(null);
-        },
-        children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: AppearanceDialogs_default.plainDot, "aria-hidden": true }),
-          t("appearance.noColor")
-        ]
-      }
-    )
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { className: AppearanceDialogs_default.nameRow, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: AppearanceDialogs_default.nameLabel, children: t("appearance.tag.name") }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+        "input",
+        {
+          className: AppearanceDialogs_default.nameInput,
+          value: name2,
+          maxLength: MAX_TAG_NAME,
+          placeholder: t("appearance.tag.placeholder"),
+          "aria-label": t("appearance.tag.name"),
+          onChange: (event) => {
+            setName(event.currentTarget.value);
+          },
+          onKeyDown: (event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              commit();
+            }
+          }
+        }
+      )
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("footer", { className: AppearanceDialogs_default.footer, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: AppearanceDialogs_default.textButton, onClick: clear, children: t("appearance.noColor") }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: AppearanceDialogs_default.currentGlyph, "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: AppearanceDialogs_default.swatch, style: { backgroundColor: sessionColorHex(color) } }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: AppearanceDialogs_default.primaryButton, onClick: commit, children: editing ? t("appearance.tag.save") : t("appearance.tag.create") })
+    ] })
   ] });
 }
 
@@ -2037,6 +2123,52 @@ function deriveTimeGroups(list, sessionIds, rowState, statuses, view) {
   }
   return groups;
 }
+var UNTAGGED_TAG_KEY = "__untagged__";
+function deriveTagGroups(list, sessionIds, rowState, statuses, view) {
+  const rows = deriveFlat(list, sessionIds, rowState, statuses, view.statusFilter ?? "all");
+  const known = new Map(view.tags.map((tag) => [tag.id, tag]));
+  const byTag = /* @__PURE__ */ new Map();
+  const untagged = [];
+  for (const row of rows) {
+    const tagId = view.sessionTags[row.id];
+    if (tagId === void 0 || !known.has(tagId)) {
+      untagged.push(row);
+      continue;
+    }
+    const bucket = byTag.get(tagId);
+    if (bucket === void 0) byTag.set(tagId, [row]);
+    else bucket.push(row);
+  }
+  const expandedTags = view.expandedTags === void 0 ? void 0 : new Set(view.expandedTags);
+  const isExpanded = (key) => expandedTags === void 0 || expandedTags.has(key);
+  const groups = [];
+  for (const tag of view.tags) {
+    const members = byTag.get(tag.id);
+    if (members === void 0 || members.length === 0) continue;
+    const expanded = isExpanded(tag.id);
+    groups.push({
+      key: tag.id,
+      tagId: tag.id,
+      label: tag.name.trim() === "" ? view.colorLabel(tag.color) : tag.name,
+      color: tag.color,
+      sessionCount: members.length,
+      expanded,
+      sessions: expanded ? members : []
+    });
+  }
+  if (untagged.length > 0) {
+    const expanded = isExpanded(UNTAGGED_TAG_KEY);
+    groups.push({
+      key: UNTAGGED_TAG_KEY,
+      tagId: null,
+      label: view.untaggedLabel,
+      sessionCount: untagged.length,
+      expanded,
+      sessions: expanded ? untagged : []
+    });
+  }
+  return groups;
+}
 function deriveSearchResults(list, workspaces, query, archivedSessionIds, archivedFilter, statuses, content, limit) {
   const q = query.trim().toLowerCase();
   if (q === "") return { items: [], hasMore: false };
@@ -2135,7 +2267,11 @@ var Rows_default = {
   visuallyHidden: "Rows_visuallyHidden",
   folderActive: "Rows_folderActive",
   folderCustom: "Rows_folderCustom",
-  sessionColorDot: "Rows_sessionColorDot",
+  tagMarker: "Rows_tagMarker",
+  tagMarkerDot: "Rows_tagMarkerDot",
+  tagMarkerRing: "Rows_tagMarkerRing",
+  tagMarkerSpin: "Rows_tagMarkerSpin",
+  bucketDot: "Rows_bucketDot",
   chevron: "Rows_chevron",
   folder: "Rows_folder",
   arrow: "Rows_arrow",
@@ -2366,7 +2502,7 @@ function ProjectRow({
     }
   );
 }
-function TimeBucketRowItem({ label, count, expanded, onToggle, rowKey }) {
+function TimeBucketRowItem({ label, count, expanded, onToggle, rowKey, accent }) {
   return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
     "div",
     {
@@ -2377,6 +2513,7 @@ function TimeBucketRowItem({ label, count, expanded, onToggle, rowKey }) {
       onClick: onToggle,
       children: [
         /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: clsx_default(Rows_default.slot, Rows_default.chevron), children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(import_dsh_client_ui_primitives3.IconTriangleRightFillRegular, { className: clsx_default(Rows_default.arrow, expanded && Rows_default.arrowOpen) }) }),
+        accent !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: Rows_default.bucketDot, style: { backgroundColor: accent }, "aria-hidden": "true" }),
         /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: Rows_default.projectText, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: Rows_default.title, children: label }) }),
         /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: Rows_default.meta, children: count })
       ]
@@ -2435,6 +2572,16 @@ function sessionStatuses(node, t) {
 function SessionStatusDots({ statuses }) {
   return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [
     /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(import_dsh_client_ui_primitives3.StateDot, { state: statuses[0].state }),
+    statuses.map((status) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: Rows_default.visuallyHidden, children: status.label }, status.label))
+  ] });
+}
+function SessionTagMarker({ accent, statuses }) {
+  const state = statuses[0].state;
+  return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("span", { className: Rows_default.tagMarker, "data-state": state, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: Rows_default.tagMarkerDot, style: { backgroundColor: accent }, "aria-hidden": "true" }),
+      state !== "idle" && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: Rows_default.tagMarkerRing, "aria-hidden": "true" })
+    ] }),
     statuses.map((status) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: Rows_default.visuallyHidden, children: status.label }, status.label))
   ] });
 }
@@ -2606,7 +2753,7 @@ function SessionNodeItem({
         drag.drop(rowHalf(e));
       },
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: Rows_default.slot, children: !row.archived && !row.blank && (showStatus ? /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(SessionStatusDots, { statuses }) : accent === void 0 ? renderSlot("sidebar.session.row.leading", { sessionId: node.id }) : /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: Rows_default.sessionColorDot, style: { backgroundColor: accent }, "aria-hidden": "true" })) }),
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: Rows_default.slot, children: !row.archived && !row.blank && (accent !== void 0 ? /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(SessionTagMarker, { accent, statuses }) : showStatus ? /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(SessionStatusDots, { statuses }) : renderSlot("sidebar.session.row.leading", { sessionId: node.id })) }),
         /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
           "span",
           {
@@ -2863,6 +3010,8 @@ function WorkspacePickFlow({
 var import_jsx_runtime6 = require("react/jsx-runtime");
 var EXPAND_SLIDE_MS = 300;
 var NO_APPEARANCE = {};
+var NO_TAGS = [];
+var NO_FOLDS = {};
 var SEARCH_DEBOUNCE_MS = 250;
 var SEARCH_QUERY_MAX_CODE_UNITS = 500;
 var SESSION_WATERMARK_BASE = 5;
@@ -2953,6 +3102,7 @@ function ViewOptionsMenu({
         { id: "workspace-tree", label: t("groupBy.workspaceTree"), icon: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(import_dsh_client_ui_primitives5.IconWorkspaceTreeOutlineRegular, {}) },
         { id: "flat", label: t("groupBy.flat"), icon: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(import_dsh_client_ui_primitives5.IconFlatListOutlineRegular, {}) },
         { id: "time", label: t("groupBy.time"), icon: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(import_dsh_client_ui_primitives5.IconClockOutlineRegular, {}) },
+        { id: "tag", label: t("groupBy.tag"), icon: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(AppearanceIcon, { spec: { kind: "icon", value: "tag" }, size: 16 }) },
         { type: "separator", id: "order-by-separator" },
         { type: "label", id: "order-by", text: t("orderBy.label") },
         { id: "manual", label: t("orderBy.manual"), icon: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(import_dsh_client_ui_primitives5.IconChevronsUpDownOutlineRegular, {}) },
@@ -2966,7 +3116,7 @@ function ViewOptionsMenu({
         { default: "hide-archived", show: "show-archived", only: "only-archived" }[archivedFilter]
       ],
       onSelect: (id) => {
-        if (id === "workspace" || id === "workspace-tree" || id === "flat" || id === "time") onGroupPick(id);
+        if (id === "workspace" || id === "workspace-tree" || id === "flat" || id === "time" || id === "tag") onGroupPick(id);
         else if (id === "manual" || id === "updated") onOrderPick(id);
         else if (id === "show-workspace-name") onShowWorkspaceNameToggle(!showWorkspaceName);
         else if (id === "hide-archived") onArchivedFilterPick("default");
@@ -3654,6 +3804,111 @@ function TimeGroups({
     }
   ) });
 }
+function TagGroups({
+  list,
+  sessionIds,
+  rowState,
+  statusFilter,
+  tags,
+  sessionTags,
+  tagExpansion,
+  onToggleTag,
+  workspaceLabelOf,
+  onLeaveArchivedOnly,
+  useSessionStatus,
+  useSessionAccess,
+  open,
+  onSessionRenameRequest,
+  usePanelInfo,
+  workspaceReady,
+  animationResetKey,
+  revealSessionId,
+  onSessionRevealed,
+  renderSlot,
+  renderFactorySlot,
+  useContextMenuTarget,
+  useContextMenu,
+  home,
+  t
+}) {
+  const panelActive = usePanelInfo((info) => info.activePanelId !== null);
+  const statuses = useSessionStatus((s) => s);
+  const now = Date.now();
+  const expandedTags = (0, import_react4.useMemo)(
+    () => [...tags.map((tag) => tag.id), UNTAGGED_TAG_KEY].filter((key) => tagExpansion[key] !== false),
+    [tagExpansion, tags]
+  );
+  const untaggedLabel = t("appearance.tag.untagged");
+  const colorLabel = (0, import_react4.useCallback)((color) => t("appearance.color." + color), [t]);
+  const groups = (0, import_react4.useMemo)(
+    () => deriveTagGroups(list, sessionIds, rowState, statuses, {
+      tags,
+      sessionTags,
+      expandedTags,
+      statusFilter,
+      colorLabel,
+      untaggedLabel
+    }),
+    [colorLabel, expandedTags, list, rowState, sessionIds, sessionTags, statusFilter, statuses, tags, untaggedLabel]
+  );
+  const currentId = panelActive ? void 0 : Object.values(list.byId).find((session) => (session.retainedBy.mainView ?? 0) > 0)?.id;
+  const rowKeys = [];
+  for (const group of groups) {
+    rowKeys.push(`bucket:${group.key}`);
+    for (const session of group.sessions) rowKeys.push(`session:${session.id}`);
+  }
+  return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(import_dsh_client_ui_primitives5.HoverCardGroup, { className: clsx_default(WorkspaceBrowser_default.treeBody, WorkspaceBrowser_default.wide), children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+    import_dsh_client_ui_primitives5.AnimatedRows,
+    {
+      className: clsx_default(WorkspaceBrowser_default.list, WorkspaceBrowser_default.flatList),
+      role: "tree",
+      label: t("section.sessions"),
+      rowKeys: rowKeys.length === 0 ? ["empty"] : rowKeys,
+      ready: list.phase === "ready" && workspaceReady,
+      resetKey: animationResetKey,
+      children: [
+        groups.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(EmptySessions, { rowState, statusFilter, onLeaveArchivedOnly, t }),
+        groups.map((group) => /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_react4.Fragment, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+            TimeBucketRowItem,
+            {
+              rowKey: group.key,
+              label: group.label,
+              count: group.sessionCount,
+              expanded: group.expanded,
+              accent: group.color === void 0 ? void 0 : sessionColorHex(group.color),
+              onToggle: () => {
+                onToggleTag(group.key, !group.expanded);
+              }
+            }
+          ),
+          group.sessions.map((node) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+            SessionNodeItem,
+            {
+              node,
+              currentId,
+              now,
+              onOpen: open,
+              onRenameRequest: onSessionRenameRequest,
+              renderSlot,
+              renderFactorySlot,
+              useContextMenu,
+              useContextMenuTarget,
+              workspaceLabel: workspaceLabelOf?.(node.id),
+              onReveal: node.id === revealSessionId ? () => {
+                onSessionRevealed(node.id);
+              } : void 0,
+              useSessionAccess,
+              home,
+              t
+            },
+            node.id
+          ))
+        ] }, group.key))
+      ]
+    }
+  ) });
+}
 function StatusTabs({ counts, value, onChange, t }) {
   const tabs = [
     { id: "all", label: t("statusTab.all") },
@@ -3806,7 +4061,19 @@ function WorkspaceBrowser({
   const textScale = useStore((s) => s.textScale ?? "normal");
   const showWorkspaceName = useStore((s) => s.showWorkspaceName === true);
   const workspaceIcons = useStore((s) => s.workspaceIcons ?? NO_APPEARANCE);
-  const sessionColors = useStore((s) => s.sessionColors ?? NO_APPEARANCE);
+  const tags = useStore((s) => s.tags ?? NO_TAGS);
+  const sessionTags = useStore((s) => s.sessionTags ?? NO_APPEARANCE);
+  const tagExpansion = useStore((s) => s.tagExpansion ?? NO_FOLDS);
+  const sessionColors = (0, import_react4.useMemo)(() => {
+    if (tags.length === 0) return NO_APPEARANCE;
+    const colorByTag = new Map(tags.map((tag) => [tag.id, tag.color]));
+    const colors = {};
+    for (const [sessionId, tagId] of Object.entries(sessionTags)) {
+      const color = colorByTag.get(tagId);
+      if (color !== void 0) colors[sessionId] = color;
+    }
+    return colors;
+  }, [sessionTags, tags]);
   const appearanceActions = actions;
   const groupExpansion = useStore((s) => s.groupExpansion);
   const sessionOrderByAccount = useStore((s) => s.sessionOrderByAccount);
@@ -4250,6 +4517,35 @@ function WorkspaceBrowser({
         home,
         t
       }
+    ) : groupBy === "tag" ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+      TagGroups,
+      {
+        useSessionAccess,
+        usePanelInfo,
+        list,
+        sessionIds: orderedFlatSessionIds,
+        rowState,
+        statusFilter,
+        tags,
+        sessionTags,
+        tagExpansion,
+        onToggleTag: actions.setTagExpanded,
+        workspaceLabelOf,
+        onLeaveArchivedOnly: leaveArchivedOnly,
+        workspaceReady,
+        animationResetKey: `${groupBy}/${orderBy}/${archivedFilter}/${statusFilter}`,
+        useSessionStatus,
+        open: guardedOpen,
+        onSessionRenameRequest: requestSessionRename,
+        renderSlot,
+        renderFactorySlot,
+        useContextMenu,
+        useContextMenuTarget,
+        revealSessionId,
+        onSessionRevealed: acknowledgeSessionReveal,
+        home,
+        t
+      }
     ) : groupBy === "flat" ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
       FlatList,
       {
@@ -4330,12 +4626,19 @@ function WorkspaceBrowser({
       {
         t,
         workspaceIcons,
-        sessionColors,
+        tags,
+        sessionTags,
         onWorkspaceIcon: (workspaceId, spec) => {
           appearanceActions.setWorkspaceIcon?.(workspaceId, spec);
         },
-        onSessionColor: (sessionId, color) => {
-          appearanceActions.setSessionColor?.(sessionId, color);
+        onAssignTag: (sessionId, tagId) => {
+          appearanceActions.setSessionTag?.(sessionId, tagId);
+        },
+        onCreateTag: (sessionId, name2, color) => {
+          appearanceActions.createTag?.(sessionId, name2, color);
+        },
+        onUpdateTag: (tagId, name2, color) => {
+          appearanceActions.updateTag?.(tagId, name2, color);
         }
       }
     )
@@ -4345,18 +4648,24 @@ function WorkspaceBrowser({
 // src/browser/locales.ts
 var appearanceZh = {
   "appearance.workspaceIcon": "工作区图标",
-  "appearance.sessionColor": "会话颜色",
+  "appearance.sessionColor": "标签",
   "appearance.icon.title": "选择图标",
-  "appearance.color.title": "选择颜色",
+  "appearance.color.title": "选择标签",
   "appearance.icon.hint": "显示在工作区名称前",
-  "appearance.color.hint": "用于该会话的状态点",
+  "appearance.color.hint": "给会话打上标签，可按标签分组",
   "appearance.tab.emoji": "Emoji",
   "appearance.tab.icon": "图标",
   "appearance.search": "搜索图标",
   "appearance.noMatches": "没有匹配的图标",
   "appearance.reset": "恢复默认",
   "appearance.done": "完成",
-  "appearance.noColor": "无颜色",
+  "appearance.noColor": "无标签",
+  "appearance.tag.name": "名称",
+  "appearance.tag.placeholder": "给标签起个名字",
+  "appearance.tag.save": "保存",
+  "appearance.tag.create": "创建",
+  "appearance.tag.new": "新建标签",
+  "appearance.tag.untagged": "无标签",
   "appearance.group.work": "工作",
   "appearance.group.tech": "技术",
   "appearance.group.nature": "自然",
@@ -4379,18 +4688,24 @@ var appearanceZh = {
 };
 var appearanceEn = {
   "appearance.workspaceIcon": "Workspace icon",
-  "appearance.sessionColor": "Session color",
+  "appearance.sessionColor": "Tag",
   "appearance.icon.title": "Choose an icon",
-  "appearance.color.title": "Choose a color",
+  "appearance.color.title": "Choose a tag",
   "appearance.icon.hint": "Shown before the workspace name",
-  "appearance.color.hint": "Marks this session’s dot",
+  "appearance.color.hint": "Tags this session; tags also group the sidebar",
   "appearance.tab.emoji": "Emoji",
   "appearance.tab.icon": "Icons",
   "appearance.search": "Search icons",
   "appearance.noMatches": "No matching icon",
   "appearance.reset": "Reset",
   "appearance.done": "Done",
-  "appearance.noColor": "No color",
+  "appearance.noColor": "No tag",
+  "appearance.tag.name": "Name",
+  "appearance.tag.placeholder": "Name this tag",
+  "appearance.tag.save": "Save",
+  "appearance.tag.create": "Create",
+  "appearance.tag.new": "New tag",
+  "appearance.tag.untagged": "Untagged",
   "appearance.group.work": "Work",
   "appearance.group.tech": "Tech",
   "appearance.group.nature": "Nature",
@@ -4413,18 +4728,24 @@ var appearanceEn = {
 };
 var appearanceJa = {
   "appearance.workspaceIcon": "ワークスペースのアイコン",
-  "appearance.sessionColor": "セッションの色",
+  "appearance.sessionColor": "タグ",
   "appearance.icon.title": "アイコンを選択",
-  "appearance.color.title": "色を選択",
+  "appearance.color.title": "タグを選択",
   "appearance.icon.hint": "ワークスペース名の前に表示",
-  "appearance.color.hint": "このセッションのドットに使用",
+  "appearance.color.hint": "セッションに付けるタグ。タグでグループ化できます",
   "appearance.tab.emoji": "絵文字",
   "appearance.tab.icon": "アイコン",
   "appearance.search": "アイコンを検索",
   "appearance.noMatches": "一致するアイコンなし",
   "appearance.reset": "既定に戻す",
   "appearance.done": "完了",
-  "appearance.noColor": "色なし",
+  "appearance.noColor": "タグなし",
+  "appearance.tag.name": "名前",
+  "appearance.tag.placeholder": "タグ名を入力",
+  "appearance.tag.save": "保存",
+  "appearance.tag.create": "作成",
+  "appearance.tag.new": "新しいタグ",
+  "appearance.tag.untagged": "タグなし",
   "appearance.group.work": "仕事",
   "appearance.group.tech": "技術",
   "appearance.group.nature": "自然",
@@ -4447,18 +4768,24 @@ var appearanceJa = {
 };
 var appearanceEs = {
   "appearance.workspaceIcon": "Icono del espacio de trabajo",
-  "appearance.sessionColor": "Color de la sesión",
+  "appearance.sessionColor": "Etiqueta",
   "appearance.icon.title": "Elegir un icono",
-  "appearance.color.title": "Elegir un color",
+  "appearance.color.title": "Elegir una etiqueta",
   "appearance.icon.hint": "Se muestra antes del nombre",
-  "appearance.color.hint": "Marca el punto de esta sesión",
+  "appearance.color.hint": "Etiqueta esta sesión; las etiquetas agrupan la barra",
   "appearance.tab.emoji": "Emoji",
   "appearance.tab.icon": "Iconos",
   "appearance.search": "Buscar iconos",
   "appearance.noMatches": "Sin coincidencias",
   "appearance.reset": "Restablecer",
   "appearance.done": "Listo",
-  "appearance.noColor": "Sin color",
+  "appearance.noColor": "Sin etiqueta",
+  "appearance.tag.name": "Nombre",
+  "appearance.tag.placeholder": "Ponle nombre a la etiqueta",
+  "appearance.tag.save": "Guardar",
+  "appearance.tag.create": "Crear",
+  "appearance.tag.new": "Nueva etiqueta",
+  "appearance.tag.untagged": "Sin etiqueta",
   "appearance.group.work": "Trabajo",
   "appearance.group.tech": "Tecnología",
   "appearance.group.nature": "Naturaleza",
@@ -4481,18 +4808,24 @@ var appearanceEs = {
 };
 var appearanceFr = {
   "appearance.workspaceIcon": "Icône de l’espace de travail",
-  "appearance.sessionColor": "Couleur de la session",
+  "appearance.sessionColor": "Étiquette",
   "appearance.icon.title": "Choisir une icône",
-  "appearance.color.title": "Choisir une couleur",
+  "appearance.color.title": "Choisir une étiquette",
   "appearance.icon.hint": "Affiché avant le nom",
-  "appearance.color.hint": "Marque la pastille de la session",
+  "appearance.color.hint": "Étiquette la session ; les étiquettes groupent la barre",
   "appearance.tab.emoji": "Emoji",
   "appearance.tab.icon": "Icônes",
   "appearance.search": "Rechercher des icônes",
   "appearance.noMatches": "Aucune icône",
   "appearance.reset": "Réinitialiser",
   "appearance.done": "Terminé",
-  "appearance.noColor": "Sans couleur",
+  "appearance.noColor": "Sans étiquette",
+  "appearance.tag.name": "Nom",
+  "appearance.tag.placeholder": "Nommer l’étiquette",
+  "appearance.tag.save": "Enregistrer",
+  "appearance.tag.create": "Créer",
+  "appearance.tag.new": "Nouvelle étiquette",
+  "appearance.tag.untagged": "Sans étiquette",
   "appearance.group.work": "Travail",
   "appearance.group.tech": "Technique",
   "appearance.group.nature": "Nature",
@@ -4515,18 +4848,24 @@ var appearanceFr = {
 };
 var appearanceDe = {
   "appearance.workspaceIcon": "Arbeitsbereichssymbol",
-  "appearance.sessionColor": "Sitzungsfarbe",
+  "appearance.sessionColor": "Tag",
   "appearance.icon.title": "Symbol wählen",
-  "appearance.color.title": "Farbe wählen",
+  "appearance.color.title": "Tag wählen",
   "appearance.icon.hint": "Erscheint vor dem Namen",
-  "appearance.color.hint": "Markiert den Punkt der Sitzung",
+  "appearance.color.hint": "Tagt die Sitzung; Tags gruppieren die Seitenleiste",
   "appearance.tab.emoji": "Emoji",
   "appearance.tab.icon": "Symbole",
   "appearance.search": "Symbole suchen",
   "appearance.noMatches": "Kein passendes Symbol",
   "appearance.reset": "Zurücksetzen",
   "appearance.done": "Fertig",
-  "appearance.noColor": "Ohne Farbe",
+  "appearance.noColor": "Kein Tag",
+  "appearance.tag.name": "Name",
+  "appearance.tag.placeholder": "Tag benennen",
+  "appearance.tag.save": "Speichern",
+  "appearance.tag.create": "Erstellen",
+  "appearance.tag.new": "Neuer Tag",
+  "appearance.tag.untagged": "Ohne Tag",
   "appearance.group.work": "Arbeit",
   "appearance.group.tech": "Technik",
   "appearance.group.nature": "Natur",
@@ -4549,18 +4888,24 @@ var appearanceDe = {
 };
 var appearanceRu = {
   "appearance.workspaceIcon": "Значок рабочей области",
-  "appearance.sessionColor": "Цвет сессии",
+  "appearance.sessionColor": "Метка",
   "appearance.icon.title": "Выбрать значок",
-  "appearance.color.title": "Выбрать цвет",
+  "appearance.color.title": "Выбрать метку",
   "appearance.icon.hint": "Показывается перед названием",
-  "appearance.color.hint": "Отмечает точку сессии",
+  "appearance.color.hint": "Помечает сессию; метки группируют панель",
   "appearance.tab.emoji": "Эмодзи",
   "appearance.tab.icon": "Значки",
   "appearance.search": "Поиск значков",
   "appearance.noMatches": "Нет подходящих значков",
   "appearance.reset": "Сбросить",
   "appearance.done": "Готово",
-  "appearance.noColor": "Без цвета",
+  "appearance.noColor": "Без метки",
+  "appearance.tag.name": "Название",
+  "appearance.tag.placeholder": "Назовите метку",
+  "appearance.tag.save": "Сохранить",
+  "appearance.tag.create": "Создать",
+  "appearance.tag.new": "Новая метка",
+  "appearance.tag.untagged": "Без метки",
   "appearance.group.work": "Работа",
   "appearance.group.tech": "Техника",
   "appearance.group.nature": "Природа",
@@ -4583,18 +4928,24 @@ var appearanceRu = {
 };
 var appearancePt = {
   "appearance.workspaceIcon": "Ícone do espaço de trabalho",
-  "appearance.sessionColor": "Cor da sessão",
+  "appearance.sessionColor": "Etiqueta",
   "appearance.icon.title": "Escolher um ícone",
-  "appearance.color.title": "Escolher uma cor",
+  "appearance.color.title": "Escolher uma etiqueta",
   "appearance.icon.hint": "Aparece antes do nome",
-  "appearance.color.hint": "Marca o ponto da sessão",
+  "appearance.color.hint": "Etiqueta esta sessão; as etiquetas agrupam a barra",
   "appearance.tab.emoji": "Emoji",
   "appearance.tab.icon": "Ícones",
   "appearance.search": "Pesquisar ícones",
   "appearance.noMatches": "Nenhum ícone",
   "appearance.reset": "Redefinir",
   "appearance.done": "Concluído",
-  "appearance.noColor": "Sem cor",
+  "appearance.noColor": "Sem etiqueta",
+  "appearance.tag.name": "Nome",
+  "appearance.tag.placeholder": "Dê um nome à etiqueta",
+  "appearance.tag.save": "Salvar",
+  "appearance.tag.create": "Criar",
+  "appearance.tag.new": "Nova etiqueta",
+  "appearance.tag.untagged": "Sem etiqueta",
   "appearance.group.work": "Trabalho",
   "appearance.group.tech": "Tecnologia",
   "appearance.group.nature": "Natureza",
@@ -4636,6 +4987,7 @@ var zh = {
   "groupBy.workspaceTree": "按工作区树",
   "groupBy.flat": "单列表",
   "groupBy.time": "按时间",
+  "groupBy.tag": "按标签",
   "timeBucket.pinned": "置顶",
   "timeBucket.today": "今天",
   "timeBucket.yesterday": "昨天",
@@ -4774,6 +5126,7 @@ var en = {
   "groupBy.workspaceTree": "Workspace Tree",
   "groupBy.flat": "In one list",
   "groupBy.time": "By time",
+  "groupBy.tag": "By tag",
   "timeBucket.pinned": "Pinned",
   "timeBucket.today": "Today",
   "timeBucket.yesterday": "Yesterday",
@@ -4912,6 +5265,7 @@ var ja = {
   "groupBy.workspaceTree": "ワークスペースツリー",
   "groupBy.flat": "1つのリスト",
   "groupBy.time": "時間別",
+  "groupBy.tag": "タグ別",
   "timeBucket.pinned": "ピン留め",
   "timeBucket.today": "今日",
   "timeBucket.yesterday": "昨日",
@@ -5050,6 +5404,7 @@ var es = {
   "groupBy.workspaceTree": "Árbol del espacio de trabajo",
   "groupBy.flat": "en una lista",
   "groupBy.time": "Por tiempo",
+  "groupBy.tag": "Por etiqueta",
   "timeBucket.pinned": "Fijadas",
   "timeBucket.today": "Hoy",
   "timeBucket.yesterday": "Ayer",
@@ -5188,6 +5543,7 @@ var fr = {
   "groupBy.workspaceTree": "Arborescence de l'espace de travail",
   "groupBy.flat": "Dans une liste",
   "groupBy.time": "Par date",
+  "groupBy.tag": "Par étiquette",
   "timeBucket.pinned": "Épinglées",
   "timeBucket.today": "Aujourd'hui",
   "timeBucket.yesterday": "Hier",
@@ -5326,6 +5682,7 @@ var de = {
   "groupBy.workspaceTree": "Arbeitsbereichsbaum",
   "groupBy.flat": "In einer Liste",
   "groupBy.time": "Nach Zeit",
+  "groupBy.tag": "Nach Tag",
   "timeBucket.pinned": "Angeheftet",
   "timeBucket.today": "Heute",
   "timeBucket.yesterday": "Gestern",
@@ -5464,6 +5821,7 @@ var ru = {
   "groupBy.workspaceTree": "Дерево рабочей области",
   "groupBy.flat": "В одном списке",
   "groupBy.time": "По времени",
+  "groupBy.tag": "По метке",
   "timeBucket.pinned": "Закреплённые",
   "timeBucket.today": "Сегодня",
   "timeBucket.yesterday": "Вчера",
@@ -5602,6 +5960,7 @@ var pt = {
   "groupBy.workspaceTree": "Árvore do espaço de trabalho",
   "groupBy.flat": "Em uma lista",
   "groupBy.time": "Por tempo",
+  "groupBy.tag": "Por etiqueta",
   "timeBucket.pinned": "Fixadas",
   "timeBucket.today": "Hoje",
   "timeBucket.yesterday": "Ontem",
@@ -5744,8 +6103,25 @@ var PLUS_INIT = {
   textScale: "normal",
   showWorkspaceName: false,
   workspaceIcons: {},
-  sessionColors: {}
+  tags: [],
+  sessionTags: {}
 };
+function migrateSessionColors(legacy) {
+  const colors = readAppearanceRecord(legacy, isSessionColorId);
+  const tags = [];
+  const byColor = /* @__PURE__ */ new Map();
+  const sessionTags = {};
+  for (const [sessionId, color] of Object.entries(colors)) {
+    let tag = byColor.get(color);
+    if (tag === void 0) {
+      tag = { id: `color-${color}`, name: "", color };
+      byColor.set(color, tag);
+      tags.push(tag);
+    }
+    sessionTags[sessionId] = tag.id;
+  }
+  return { tags, sessionTags };
+}
 function readAppearanceRecord(raw, valid) {
   if (typeof raw !== "object" || raw === null) return {};
   const out = {};
@@ -5764,15 +6140,27 @@ function readPlus() {
     const raw = globalThis.localStorage?.getItem(PLUS_KEY);
     if (raw === null || raw === void 0) return PLUS_INIT;
     const parsed = JSON.parse(raw);
-    return {
+    const storedTags = readTagDefinitions(parsed.tags);
+    const migrated = storedTags.length === 0 ? migrateSessionColors(parsed.sessionColors) : void 0;
+    const tags = migrated?.tags ?? storedTags;
+    const tagIds = new Set(tags.map((tag) => tag.id));
+    const plus = {
       timeMode: parsed.timeMode === true,
       statusFilter: typeof parsed.statusFilter === "string" ? parsed.statusFilter : "all",
       timeBucketExpansion: typeof parsed.timeBucketExpansion === "object" && parsed.timeBucketExpansion !== null ? parsed.timeBucketExpansion : {},
       textScale: isTextScale(parsed.textScale) ? parsed.textScale : PLUS_INIT.textScale,
       showWorkspaceName: parsed.showWorkspaceName === true,
       workspaceIcons: readAppearanceRecord(parsed.workspaceIcons, (value) => parseIconSpec(value) !== null),
-      sessionColors: readAppearanceRecord(parsed.sessionColors, isSessionColorId)
+      tags,
+      sessionTags: migrated?.sessionTags ?? readAppearanceRecord(parsed.sessionTags, (value) => tagIds.has(value))
     };
+    if (migrated !== void 0) {
+      try {
+        globalThis.localStorage?.setItem(PLUS_KEY, JSON.stringify(plus));
+      } catch {
+      }
+    }
+    return plus;
   } catch {
     return PLUS_INIT;
   }
@@ -5795,6 +6183,7 @@ function setPlus(patch) {
 }
 var PICKED = [
   "groupBy.time",
+  "groupBy.tag",
   "timeBucket.pinned",
   "timeBucket.today",
   "timeBucket.yesterday",
@@ -5824,6 +6213,12 @@ var PICKED = [
   "appearance.reset",
   "appearance.done",
   "appearance.noColor",
+  "appearance.tag.name",
+  "appearance.tag.placeholder",
+  "appearance.tag.save",
+  "appearance.tag.create",
+  "appearance.tag.new",
+  "appearance.tag.untagged",
   "appearance.group.work",
   "appearance.group.tech",
   "appearance.group.nature",
@@ -5902,14 +6297,14 @@ function anchorFor(rowKey) {
 function PaletteIcon() {
   return React2.createElement(AppearanceIcon, { spec: { kind: "icon", value: "palette" }, size: 16 });
 }
-function SessionColorMenuItem(props) {
+function SessionTagMenuItem(props) {
   const { sessionId, displayTitle: displayTitle2, t, useMenuOpenState } = props;
   const [, setMenuOpen] = useMenuOpenState();
   return React2.createElement(import_dsh_client_ui_primitives6.MenuItemButton, {
     icon: React2.createElement(PaletteIcon),
     onSelect: () => {
       setMenuOpen(false);
-      requestAppearance({ kind: "session-color", sessionId, displayTitle: displayTitle2, anchor: anchorFor("session:" + sessionId) });
+      requestAppearance({ kind: "session-tag", sessionId, displayTitle: displayTitle2, anchor: anchorFor("session:" + sessionId) });
     }
   }, t("appearance.sessionColor"));
 }
@@ -5959,7 +6354,8 @@ function Seat(props) {
     textScale: plus.textScale,
     showWorkspaceName: plus.showWorkspaceName,
     workspaceIcons: plus.workspaceIcons,
-    sessionColors: plus.sessionColors
+    tags: plus.tags,
+    sessionTags: plus.sessionTags
   }), [shippedState, plus]);
   const snapRef = React2.useRef(snapshot);
   snapRef.current = snapshot;
@@ -5991,11 +6387,24 @@ function Seat(props) {
       else next[workspaceId] = spec;
       setPlus({ workspaceIcons: next });
     },
-    setSessionColor: (sessionId, color) => {
-      const next = { ...plusState.sessionColors };
-      if (color === null) delete next[sessionId];
-      else next[sessionId] = color;
-      setPlus({ sessionColors: next });
+    setSessionTag: (sessionId, tagId) => {
+      const next = { ...plusState.sessionTags };
+      if (tagId === null) delete next[sessionId];
+      else next[sessionId] = tagId;
+      setPlus({ sessionTags: next });
+    },
+    createTag: (sessionId, name2, color) => {
+      const id = `tag-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      const tag = { id, name: name2.slice(0, MAX_TAG_NAME), color };
+      setPlus({
+        tags: [...plusState.tags, tag],
+        sessionTags: { ...plusState.sessionTags, [sessionId]: id }
+      });
+    },
+    updateTag: (tagId, name2, color) => {
+      setPlus({
+        tags: plusState.tags.map((tag) => tag.id === tagId ? { ...tag, name: name2.slice(0, MAX_TAG_NAME), color } : tag)
+      });
     }
   }), [shippedActions]);
   const t = useCompositeT(rest.t);
@@ -6047,8 +6456,8 @@ function apply(ctx) {
   }
   try {
     slots.inject("sidebar.workspaces.session.menu.item", () => slots.register(
-      { name: "sidebar.workspaces.session.menu.item", id: "dsh-sidebar-view-session-color", order: 250 },
-      (props) => React2.createElement(SessionColorMenuItem, { ...props, t })
+      { name: "sidebar.workspaces.session.menu.item", id: "dsh-sidebar-view-session-tag", order: 250 },
+      (props) => React2.createElement(SessionTagMenuItem, { ...props, t })
     ));
   } catch (error) {
     console.warn("[dsh-sidebar-view] shipped session menu slot unavailable", error);
@@ -6094,7 +6503,7 @@ function apply(ctx) {
   if (existing) return
   var el = document.createElement('style')
   el.setAttribute('data-plugin', id)
-  el.textContent = "/* src/browser/rows/AppearanceDialogs.module.css */\n.AppearanceDialogs_panel {\n  position: fixed;\n  z-index: 1200;\n  box-sizing: border-box;\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  width: 272px;\n  padding: 6px;\n  border-radius: var(--dsw-radius-md);\n  background: var(--dsw-menu-surface-fill, var(--dsw-alias-bg-layer-2));\n  backdrop-filter: var(--dsw-menu-backdrop-filter, blur(20px));\n  box-shadow: var(--dsw-elevation-prominent);\n  color: var(--dsw-alias-label-primary);\n  outline: none;\n}\n.AppearanceDialogs_head {\n  display: flex;\n  align-items: baseline;\n  gap: 6px;\n  min-width: 0;\n  padding: 2px 4px 0;\n}\n.AppearanceDialogs_headTitle {\n  flex: none;\n  color: var(--dsw-alias-label-primary);\n  font-size: 12px;\n  font-weight: 600;\n  line-height: 16px;\n}\n.AppearanceDialogs_headScope {\n  min-width: 0;\n  overflow: hidden;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n  line-height: 16px;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n.AppearanceDialogs_toolbar {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.AppearanceDialogs_tabs {\n  display: flex;\n  flex: none;\n  gap: 2px;\n  padding: 2px;\n  border-radius: var(--dsw-radius-sm);\n  background: var(--dsw-alias-interactive-bg-hover);\n}\n.AppearanceDialogs_tab {\n  height: 22px;\n  padding: 0 8px;\n  border: 0;\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  font: inherit;\n  font-size: 11px;\n  line-height: 16px;\n  cursor: pointer;\n}\n.AppearanceDialogs_tabOn {\n  background: var(--dsw-alias-bg-layer-1);\n  box-shadow: var(--dsw-elevation-soft);\n  color: var(--dsw-alias-label-primary);\n}\n.AppearanceDialogs_search {\n  flex: 1;\n  min-width: 0;\n  height: 24px;\n  padding: 0 6px;\n  border: 0.5px solid var(--dsw-alias-border-l2);\n  border-radius: var(--dsw-radius-sm);\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-primary);\n  font: inherit;\n  font-size: 11px;\n}\n.AppearanceDialogs_scroll {\n  max-height: 224px;\n  margin: 0 -4px;\n  padding: 0 4px;\n  overflow-y: auto;\n  overscroll-behavior: contain;\n}\n.AppearanceDialogs_groupLabel {\n  margin: 6px 2px 3px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 10px;\n  font-weight: 500;\n  line-height: 14px;\n}\n.AppearanceDialogs_groupLabel:first-child {\n  margin-top: 0;\n}\n.AppearanceDialogs_grid {\n  display: grid;\n  grid-template-columns: repeat(7, 1fr);\n  gap: 2px;\n}\n.AppearanceDialogs_cell {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  height: 30px;\n  min-width: 0;\n  padding: 0;\n  border: 0;\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 16px;\n  line-height: 1;\n  cursor: pointer;\n}\n.AppearanceDialogs_cellOn {\n  background: var(--dsw-alias-interactive-bg-hover);\n  box-shadow: inset 0 0 0 1px var(--dsw-alias-state-business-primary);\n  color: var(--dsw-alias-label-primary);\n}\n.AppearanceDialogs_empty {\n  padding: 16px 8px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n  text-align: center;\n}\n.AppearanceDialogs_footer {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  padding-top: 6px;\n  border-top: 0.5px solid var(--dsw-alias-border-l1);\n}\n.AppearanceDialogs_textButton {\n  height: 24px;\n  padding: 0 6px;\n  border: 0;\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  font: inherit;\n  font-size: 11px;\n  cursor: pointer;\n}\n.AppearanceDialogs_currentGlyph {\n  display: inline-flex;\n  align-items: center;\n  margin-inline-start: auto;\n  color: var(--dsw-alias-label-tertiary);\n}\n.AppearanceDialogs_primaryButton {\n  height: 24px;\n  padding: 0 12px;\n  border: 0;\n  border-radius: var(--dsw-radius-sm);\n  background: var(--dsw-alias-label-primary);\n  color: var(--dsw-alias-bg-base);\n  font: inherit;\n  font-size: 11px;\n  font-weight: 600;\n  cursor: pointer;\n}\n.AppearanceDialogs_swatches {\n  display: grid;\n  grid-template-columns: repeat(5, 1fr);\n  gap: 6px;\n  padding: 2px 0;\n}\n.AppearanceDialogs_swatchButton {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  height: 34px;\n  border: 0;\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  cursor: pointer;\n}\n.AppearanceDialogs_swatch {\n  width: 20px;\n  height: 20px;\n  border-radius: 50%;\n}\n.AppearanceDialogs_swatchOn {\n  background: var(--dsw-alias-interactive-bg-hover);\n  box-shadow: inset 0 0 0 1.5px var(--dsw-alias-label-primary);\n}\n.AppearanceDialogs_clearRow {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  height: 30px;\n  padding: 0 8px;\n  border: 0.5px solid var(--dsw-alias-border-l2);\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  font: inherit;\n  font-size: 11px;\n  cursor: pointer;\n}\n.AppearanceDialogs_clearRowOn {\n  border-color: transparent;\n  box-shadow: inset 0 0 0 1.5px var(--dsw-alias-label-primary);\n  color: var(--dsw-alias-label-primary);\n}\n.AppearanceDialogs_plainDot {\n  width: 12px;\n  height: 12px;\n  border: 1.5px dashed var(--dsw-alias-label-tertiary);\n  border-radius: 50%;\n}\n@media (hover: hover) {\n  .AppearanceDialogs_tab:hover,\n  .AppearanceDialogs_textButton:hover,\n  .AppearanceDialogs_clearRow:hover {\n    color: var(--dsw-alias-label-primary);\n  }\n  .AppearanceDialogs_cell:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n    color: var(--dsw-alias-label-primary);\n  }\n  .AppearanceDialogs_swatchButton:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.AppearanceDialogs_tab:focus-visible,\n.AppearanceDialogs_cell:focus-visible,\n.AppearanceDialogs_swatchButton:focus-visible,\n.AppearanceDialogs_clearRow:focus-visible,\n.AppearanceDialogs_textButton:focus-visible,\n.AppearanceDialogs_primaryButton:focus-visible,\n.AppearanceDialogs_search:focus-visible {\n  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));\n  outline-offset: -2px;\n}\n\n/* src/browser/rows/WorkspaceBrowser.module.css */\n.WorkspaceBrowser_root {\n  --workspace-toolbar-height: 36px;\n  --workspace-toolbar-gap: 0px;\n  position: relative;\n  flex: 1;\n  min-height: 0;\n  display: flex;\n  flex-direction: column;\n  box-sizing: border-box;\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) {\n  flex: none;\n  max-height: 100cqh;\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail):has(.WorkspaceBrowser_searchExpanded) {\n  height: 100cqh;\n}\n.WorkspaceBrowser_iconButton {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 28px;\n  height: 28px;\n  border: none;\n  border-radius: var(--dsw-radius-sm);\n  padding: 0;\n  background: transparent;\n  cursor: pointer;\n  color: var(--dsw-alias-label-secondary);\n}\n.WorkspaceBrowser_iconButton:focus-visible,\n.WorkspaceBrowser_searchButton:focus-visible,\n.WorkspaceBrowser_clearButton:focus-visible {\n  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));\n  outline-offset: -2px;\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_iconButton:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.WorkspaceBrowser_viewOptionsMenu {\n  min-width: 200px;\n}\n.WorkspaceBrowser_textScaleRow {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  min-height: 30px;\n  padding: 4px 8px;\n  font-size: 13px;\n  line-height: 20px;\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_textScaleLabel {\n  flex: none;\n}\n.WorkspaceBrowser_textScaleTrack {\n  display: flex;\n  flex: none;\n  gap: 2px;\n  margin-inline-start: auto;\n  padding: 2px;\n  border-radius: var(--dsw-radius-md);\n  background: var(--dsw-alias-interactive-bg-hover);\n}\n.WorkspaceBrowser_textScaleOption {\n  height: 22px;\n  padding: 0 8px;\n  border: 0;\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  font: inherit;\n  font-size: 12px;\n  line-height: 18px;\n  white-space: nowrap;\n  cursor: pointer;\n  transition: color 120ms ease;\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_textScaleOption:hover {\n    color: var(--dsw-alias-label-primary);\n  }\n}\n.WorkspaceBrowser_textScaleOptionOn {\n  background: var(--dsw-alias-bg-layer-1);\n  box-shadow: var(--dsw-elevation-soft);\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_textScaleOption:focus-visible {\n  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));\n  outline-offset: -2px;\n}\n.WorkspaceBrowser_sectionHeader {\n  flex: none;\n  display: flex;\n  align-items: center;\n  justify-content: flex-end;\n  gap: 4px;\n  height: var(--workspace-toolbar-height);\n  padding-left: var(--dsh-sidebar-row-padding);\n  margin-bottom: var(--workspace-toolbar-gap);\n  box-sizing: border-box;\n  border-radius: var(--dsw-radius-md);\n  overflow: hidden;\n  color: var(--dsw-alias-label-tertiary);\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_sectionHeader.WorkspaceBrowser_searchSpacingMotion {\n  transition:\n    margin-right 180ms var(--ds-ease-in-out),\n    padding-inline 180ms var(--ds-ease-in-out),\n    gap 180ms var(--ds-ease-in-out);\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_sectionHeader:not(:has(.WorkspaceBrowser_searchExpanded)) {\n  margin-right: -4px;\n  padding-right: 1px;\n}\n.WorkspaceBrowser_sectionLabel {\n  position: relative;\n  left: -1px;\n  flex: none;\n  max-width: 45%;\n  min-width: 0;\n  overflow: hidden;\n  white-space: nowrap;\n  line-height: 20px;\n  opacity: 1;\n  visibility: visible;\n  transition:\n    max-width 180ms var(--ds-ease-in-out),\n    margin-right 180ms var(--ds-ease-in-out),\n    opacity 120ms var(--ds-ease-in-out),\n    transform 180ms var(--ds-ease-in-out),\n    visibility 0s linear;\n}\n.WorkspaceBrowser_sectionLabelHidden {\n  max-width: 0;\n  margin-right: -4px;\n  opacity: 0;\n  transform: translateX(-4px);\n  visibility: hidden;\n  transition-delay:\n    0s,\n    0s,\n    0s,\n    0s,\n    180ms;\n}\n.WorkspaceBrowser_searchSlot {\n  flex: 1;\n  max-width: 28px;\n  min-width: 0;\n  display: flex;\n  align-items: center;\n  margin-left: auto;\n  padding-left: 0;\n  box-sizing: border-box;\n  transition: max-width 180ms var(--ds-ease-in-out), padding-left 180ms var(--ds-ease-in-out);\n}\n.WorkspaceBrowser_searchSlotExpanded {\n  max-width: 100%;\n  padding-left: 0;\n}\n.WorkspaceBrowser_headerActions {\n  flex: none;\n  display: flex;\n  align-items: center;\n  gap: 4px;\n  max-width: 60px;\n  opacity: 1;\n  overflow: hidden;\n  visibility: visible;\n  transition:\n    max-width 180ms var(--ds-ease-in-out),\n    opacity 120ms var(--ds-ease-in-out),\n    transform 180ms var(--ds-ease-in-out),\n    visibility 0s linear;\n}\n.WorkspaceBrowser_headerActionsHidden {\n  max-width: 0;\n  opacity: 0;\n  transform: translateX(4px);\n  visibility: hidden;\n  pointer-events: none;\n  transition-delay:\n    0s,\n    0s,\n    0s,\n    180ms;\n}\n.WorkspaceBrowser_search {\n  flex: none;\n  display: flex;\n  align-items: center;\n  gap: 0;\n  width: 100%;\n  height: 28px;\n  margin: 0;\n  padding: 0;\n  box-sizing: border-box;\n  border: none;\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  cursor: text;\n  color: var(--dsw-alias-label-secondary);\n  overflow: hidden;\n  transition:\n    width 180ms var(--ds-ease-in-out),\n    padding 180ms var(--ds-ease-in-out),\n    border-color 180ms var(--ds-ease-in-out),\n    background-color 180ms var(--ds-ease-in-out);\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_sectionHeader:has(.WorkspaceBrowser_searchExpanded) {\n  margin-right: 0;\n  padding-inline: calc(var(--dsh-sidebar-paint-inset) + 1px);\n  gap: 0;\n}\n.WorkspaceBrowser_sectionHeader:has(.WorkspaceBrowser_searchExpanded) .WorkspaceBrowser_sectionLabelHidden {\n  margin-right: 0;\n}\n.WorkspaceBrowser_searchExpanded {\n  width: 100%;\n  height: 32px;\n  margin-inline: 0;\n  padding: 0 4px 0 0;\n  border: 0.5px solid var(--dsw-alias-border-l4);\n  border-radius: var(--dsw-radius-md);\n  background: transparent;\n  color: var(--dsw-alias-label-caption);\n}\n.WorkspaceBrowser_searchButton {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 28px;\n  height: 28px;\n  border: none;\n  border-radius: var(--dsw-radius-sm);\n  padding: 0;\n  background: transparent;\n  cursor: pointer;\n  color: inherit;\n}\n.WorkspaceBrowser_searchExpanded .WorkspaceBrowser_searchButton {\n  width: 28px;\n  height: 32px;\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_searchButton:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n  .WorkspaceBrowser_searchExpanded .WorkspaceBrowser_searchButton:hover {\n    background: transparent;\n  }\n}\n.WorkspaceBrowser_searchInput {\n  flex: 1;\n  width: 0;\n  min-width: 0;\n  border: none;\n  outline: none;\n  background: transparent;\n  opacity: 0;\n  pointer-events: none;\n  font-size: 13px;\n  line-height: 18px;\n  color: var(--dsw-alias-label-primary);\n  transition: opacity 120ms var(--ds-ease-in-out);\n}\n.WorkspaceBrowser_searchExpanded .WorkspaceBrowser_searchInput {\n  margin-left: -2px;\n  opacity: 1;\n  pointer-events: auto;\n}\n.WorkspaceBrowser_searchInput::placeholder {\n  color: var(--dsw-alias-label-tertiary);\n}\n.WorkspaceBrowser_clearButton {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 24px;\n  height: 24px;\n  border: none;\n  border-radius: var(--dsw-radius-sm);\n  padding: 0;\n  background: transparent;\n  cursor: pointer;\n  color: var(--dsw-alias-label-secondary);\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_clearButton:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.WorkspaceBrowser_rail .WorkspaceBrowser_sectionHeader {\n  gap: 0;\n  padding-left: 0;\n  margin-bottom: 12px;\n  justify-content: flex-start;\n}\n.WorkspaceBrowser_rail .WorkspaceBrowser_headerActions {\n  max-width: none;\n}\n.WorkspaceBrowser_rail .WorkspaceBrowser_iconButton {\n  width: 36px;\n  height: 36px;\n  border-radius: var(--dsw-radius-md);\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_rail .WorkspaceBrowser_search {\n  width: 36px;\n  height: 36px;\n  padding: 0;\n  margin: 0 0 12px;\n  gap: 0;\n  border-radius: var(--dsw-radius-md);\n  border-color: transparent;\n  background: transparent;\n}\n.WorkspaceBrowser_rail .WorkspaceBrowser_searchButton {\n  width: 36px;\n  height: 36px;\n  border-radius: var(--dsw-radius-md);\n  color: var(--dsw-alias-label-primary);\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_rail .WorkspaceBrowser_searchButton:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.WorkspaceBrowser_statusTabs {\n  flex: none;\n  display: flex;\n  align-items: center;\n  gap: 2px;\n  height: 28px;\n  padding-inline: var(--dsh-sidebar-row-padding);\n  margin-bottom: 2px;\n  overflow-x: auto;\n  scrollbar-width: none;\n}\n.WorkspaceBrowser_statusTabs::-webkit-scrollbar {\n  display: none;\n}\n.WorkspaceBrowser_statusTab {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  gap: 4px;\n  height: 22px;\n  padding-inline: 8px;\n  border: none;\n  border-radius: var(--dsw-radius-md);\n  background: transparent;\n  color: var(--dsw-alias-label-tertiary);\n  font: inherit;\n  font-size: 12px;\n  line-height: 22px;\n  cursor: pointer;\n}\n.WorkspaceBrowser_statusTab:focus-visible {\n  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));\n  outline-offset: -1px;\n}\n.WorkspaceBrowser_statusTabActive,\n.WorkspaceBrowser_statusTabActive:focus-visible {\n  background: var(--dsw-alias-interactive-bg-hover);\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_statusTabCount {\n  font-variant-numeric: tabular-nums;\n  color: var(--dsw-alias-label-caption);\n}\n.WorkspaceBrowser_statusTabActive .WorkspaceBrowser_statusTabCount {\n  color: var(--dsw-alias-label-secondary);\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_statusTab:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.WorkspaceBrowser_listArea {\n  flex: 1;\n  min-height: 0;\n  display: flex;\n  flex-direction: column;\n  overflow: visible;\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_listArea {\n  display: block;\n  margin-left: -4px;\n  margin-right: calc(2px - var(--dsh-sidebar-inline-padding));\n  padding-left: 4px;\n  padding-right: calc(var(--dsh-sidebar-inline-padding) - var(--dsh-scrollbar-width) - 2px);\n  overflow-x: hidden;\n  overflow-y: auto;\n  scrollbar-gutter: stable;\n}\n@container scroll-state(scrollable: bottom) {\n  .WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_listArea {\n    overflow-y: hidden;\n  }\n}\n.WorkspaceBrowser_treeBody {\n  flex: 1;\n  min-height: 0;\n  display: flex;\n  flex-direction: column;\n  position: relative;\n}\n.WorkspaceBrowser_wide {\n  animation: WorkspaceBrowser_wide-in 200ms var(--ds-ease-in-out);\n}\n@keyframes WorkspaceBrowser_wide-in {\n  from {\n    opacity: 0;\n  }\n}\n.WorkspaceBrowser_list {\n  flex: 1;\n  min-height: 0;\n  overflow: visible;\n  padding-bottom: 16px;\n}\n.WorkspaceBrowser_flatList > * + *,\n.WorkspaceBrowser_searchTree > [role=treeitem] + [role=treeitem],\n.WorkspaceBrowser_groupSection > * + * {\n  margin-top: var(--dsh-sidebar-row-gap, 2px);\n}\n.WorkspaceBrowser_searchStatus {\n  padding: 10px 12px;\n  font-size: 12px;\n  line-height: 18px;\n  color: var(--dsw-alias-label-tertiary);\n}\n.WorkspaceBrowser_skeletonRow {\n  display: flex;\n  align-items: flex-start;\n  gap: var(--dsh-sidebar-label-gap);\n  box-sizing: border-box;\n  min-height: 48px;\n  padding: 6px var(--dsh-sidebar-row-padding) 7px;\n}\n.WorkspaceBrowser_skeletonDot {\n  flex: none;\n  width: 16px;\n  height: 16px;\n  border-radius: 50%;\n  corner-shape: round;\n}\n.WorkspaceBrowser_skeletonBars {\n  flex: 1;\n  min-width: 0;\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n}\n.WorkspaceBrowser_skeletonDot,\n.WorkspaceBrowser_skeletonBar {\n  background: var(--dsw-alias-bg-skeleton);\n  animation: WorkspaceBrowser_search-skeleton 2s cubic-bezier(0.36, 0, 0.64, 1) infinite;\n}\n.WorkspaceBrowser_skeletonBar {\n  width: 65%;\n  height: 16px;\n  border-radius: var(--dsw-radius-xs);\n}\n.WorkspaceBrowser_skeletonBarWide {\n  width: 90%;\n  height: 13px;\n}\n@keyframes WorkspaceBrowser_search-skeleton {\n  0% {\n    opacity: 1;\n  }\n  40% {\n    opacity: 0.6;\n  }\n  80%, 100% {\n    opacity: 1;\n  }\n}\n.WorkspaceBrowser_groupSection {\n  position: relative;\n}\n.WorkspaceBrowser_groupSection + .WorkspaceBrowser_groupSection {\n  margin-top: var(--dsh-sidebar-group-gap, 4px);\n}\n.WorkspaceBrowser_listTopDropIndicator,\n.WorkspaceBrowser_workspaceDropBefore::before,\n.WorkspaceBrowser_workspaceDropAfter::after {\n  content: \"\";\n  position: absolute;\n  z-index: 1;\n  left: 0;\n  right: 0;\n  height: 12px;\n  background:\n    linear-gradient(\n      55deg,\n      transparent calc(50% - 1px),\n      var(--dsw-alias-state-business-primary) calc(50% - 1px) calc(50% + 1px),\n      transparent calc(50% + 1px)) 0 0 / 5px 7px no-repeat,\n    linear-gradient(\n      125deg,\n      transparent calc(50% - 1px),\n      var(--dsw-alias-state-business-primary) calc(50% - 1px) calc(50% + 1px),\n      transparent calc(50% + 1px)) 0 5px / 5px 7px no-repeat,\n    linear-gradient(var(--dsw-alias-state-business-primary) 0 0) 4px 5px / calc(100% - 4px) 2px no-repeat;\n  pointer-events: none;\n}\n.WorkspaceBrowser_listTopDropIndicator {\n  top: -8px;\n}\n.WorkspaceBrowser_listTopDropActive > .WorkspaceBrowser_workspaceDropBefore:first-child::before {\n  display: none;\n}\n.WorkspaceBrowser_workspaceDropBefore::before {\n  top: -8px;\n}\n.WorkspaceBrowser_workspaceDropAfter::after {\n  bottom: -8px;\n}\n.WorkspaceBrowser_sessionOverflowButton {\n  width: 100%;\n  height: var(--dsh-sidebar-row-height, 28px);\n  border: none;\n  border-radius: var(--dsw-radius-sm);\n  padding: 0 var(--dsh-sidebar-row-padding) 0 calc(var(--dsh-sidebar-row-padding) + 16px + var(--dsh-sidebar-label-gap) + var(--dsh-workspace-indent, 0px));\n  background: transparent;\n  cursor: pointer;\n  text-align: left;\n  font-size: var(--dsh-sidebar-meta-size, 12px);\n  color: var(--dsw-alias-label-tertiary);\n}\n.WorkspaceBrowser_groupSection > .WorkspaceBrowser_sessionOverflowButton {\n  margin-top: 0;\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_sessionOverflowButton:hover {\n    background: transparent;\n    color: var(--dsw-alias-label-secondary);\n  }\n}\n.WorkspaceBrowser_empty {\n  padding: 16px 12px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 13px;\n}\n.WorkspaceBrowser_emptyState {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  gap: 8px;\n  margin-top: 80px;\n  padding: 0 12px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 13px;\n  line-height: 20px;\n}\n.WorkspaceBrowser_emptyState > svg {\n  margin-bottom: 4px;\n  color: var(--dsw-alias-label-caption);\n}\n.WorkspaceBrowser_emptyAction {\n  padding: 0;\n  border: none;\n  background: none;\n  cursor: pointer;\n  font-size: 13px;\n  line-height: 20px;\n  color: var(--dsw-alias-link);\n}\n.WorkspaceBrowser_renameInput {\n  box-sizing: border-box;\n  width: 100%;\n  height: 44px;\n  padding: 7px 14px;\n  border: 0.5px solid var(--dsw-alias-border-l4);\n  border-radius: var(--dsw-radius-lg);\n  outline: none;\n  background: transparent;\n  font-size: 14px;\n  font-weight: 400;\n  line-height: 22px;\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_renameInput:disabled {\n  color: var(--dsw-alias-label-dimmed);\n}\n.WorkspaceBrowser_renameError {\n  margin-top: 8px;\n  font-size: 12px;\n  line-height: 18px;\n  color: var(--dsw-alias-state-error-primary);\n}\n.WorkspaceBrowser_deleteAction:not(:disabled) {\n  color: var(--dsw-alias-state-error-primary);\n}\n.WorkspaceBrowser_deleteStatus {\n  font-size: 12px;\n  line-height: 18px;\n  color: var(--dsw-alias-label-secondary);\n}\n.WorkspaceBrowser_archiveActivity {\n  margin: 0 0 8px;\n  padding-left: 18px;\n  font-size: 13px;\n  line-height: 20px;\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_archiveActivity li {\n  overflow-wrap: anywhere;\n}\n@media (pointer: coarse) {\n  .WorkspaceBrowser_searchInput,\n  .WorkspaceBrowser_renameInput {\n    font-size: 16px;\n  }\n}\n@media (prefers-reduced-motion: reduce) {\n  .WorkspaceBrowser_wide {\n    animation: none;\n  }\n  .WorkspaceBrowser_skeletonDot,\n  .WorkspaceBrowser_skeletonBar {\n    animation: none;\n  }\n  .WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_sectionHeader.WorkspaceBrowser_searchSpacingMotion,\n  .WorkspaceBrowser_search,\n  .WorkspaceBrowser_sectionLabel,\n  .WorkspaceBrowser_searchSlot,\n  .WorkspaceBrowser_searchInput,\n  .WorkspaceBrowser_headerActions {\n    transition: none;\n  }\n}\n\n/* src/browser/rows/Rows.module.css */\n.Rows_projectRow,\n.Rows_sessionRow {\n  display: flex;\n  align-items: center;\n  gap: var(--dsh-sidebar-label-gap);\n  border-radius: var(--dsw-radius-md);\n  border-inline: var(--dsh-sidebar-paint-inset) solid transparent;\n  background-clip: padding-box;\n  box-sizing: border-box;\n  padding: 0 8px;\n  padding-inline-start: calc(var(--dsh-sidebar-row-padding) - var(--dsh-sidebar-paint-inset) + var(--dsh-workspace-indent, 0px));\n  cursor: pointer;\n  -webkit-user-select: none;\n  user-select: none;\n  color: var(--dsw-alias-label-primary);\n}\n@media (hover: hover) {\n  .Rows_projectRow:hover {\n    background-color: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.Rows_sessionRow.Rows_selected {\n  background-color: var(--dsw-alias-interactive-bg-hover);\n}\n.Rows_dragPreview {\n  background: var(--dsw-specific-sidebar-fill);\n}\n.Rows_searchResultRow {\n  display: flex;\n  flex-direction: column;\n  align-items: stretch;\n  width: 100%;\n  min-height: 48px;\n  box-sizing: border-box;\n  border: none;\n  border-radius: var(--dsw-radius-lg);\n  padding: 4px calc(var(--dsh-sidebar-row-padding) - var(--dsh-sidebar-paint-inset));\n  border-inline: var(--dsh-sidebar-paint-inset) solid transparent;\n  background: transparent;\n  background-clip: padding-box;\n  cursor: pointer;\n  text-align: left;\n  color: var(--dsw-alias-label-primary);\n}\n@media (hover: hover) {\n  .Rows_searchResultRow:hover {\n    background-color: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.Rows_searchResultRow.Rows_selected {\n  background-color: var(--dsw-alias-interactive-bg-hover);\n}\n.Rows_searchResultHeading {\n  display: flex;\n  align-items: center;\n  min-width: 0;\n}\n.Rows_searchResultTitle {\n  flex: 0 1 auto;\n  min-width: 0;\n  margin: 0 var(--dsh-sidebar-label-gap);\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: var(--dsh-sidebar-title-size, 14px);\n  line-height: var(--dsh-sidebar-title-line, 20px);\n}\n.Rows_searchResultMeta {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  min-width: 0;\n  margin-left: calc(16px + var(--dsh-sidebar-label-gap));\n}\n.Rows_searchResultWorkspace,\n.Rows_searchResultSnippet {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: var(--dsh-sidebar-meta-size, 12px);\n  line-height: 17px;\n}\n.Rows_searchResultWorkspace {\n  flex: none;\n  max-width: 40%;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_searchResultWorkspace:only-child {\n  max-width: 100%;\n}\n.Rows_searchResultSnippet {\n  flex: 1;\n  min-width: 0;\n  color: var(--dsw-alias-label-secondary);\n}\n.Rows_projectRow {\n  height: var(--dsh-sidebar-row-height, 28px);\n  align-items: center;\n  box-sizing: border-box;\n}\n.Rows_projectRow .Rows_rowActions {\n  height: 20px;\n}\n.Rows_sessionRow {\n  height: var(--dsh-sidebar-row-height, 28px);\n  gap: 0;\n}\n.Rows_sessionRow .Rows_title {\n  margin: 0 6px 0 var(--dsh-sidebar-label-gap);\n}\n.Rows_slot {\n  flex: none;\n  width: 16px;\n  height: 20px;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_visuallyHidden {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  overflow: hidden;\n  clip: rect(0 0 0 0);\n  white-space: nowrap;\n}\n.Rows_folderActive {\n  color: var(--dsw-alias-state-business-primary);\n}\n.Rows_folderCustom {\n  color: var(--dsw-alias-label-secondary);\n}\n.Rows_sessionColorDot {\n  flex: none;\n  width: 8px;\n  height: 8px;\n  border-radius: 50%;\n}\n.Rows_projectRow .Rows_chevron {\n  display: none;\n}\n@media (hover: hover) {\n  .Rows_projectRow:hover .Rows_chevron {\n    display: inline-flex;\n  }\n  .Rows_projectRow:hover .Rows_folder {\n    display: none;\n  }\n}\n.Rows_arrow {\n  transition: transform 150ms var(--ds-ease-in-out);\n}\n.Rows_arrowOpen {\n  transform: rotate(90deg);\n}\n.Rows_projectText {\n  flex: 1;\n  min-width: 0;\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n}\n.Rows_title {\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: var(--dsh-sidebar-title-size, 14px);\n  line-height: var(--dsh-sidebar-title-line, 20px);\n}\n.Rows_renameInput {\n  min-width: 0;\n  font-size: var(--dsh-sidebar-title-size, 14px);\n  line-height: var(--dsh-sidebar-title-line, 20px);\n  padding: 0 2px;\n  border: 0.5px solid var(--dsw-alias-border-l4);\n  border-radius: var(--dsw-radius-sm);\n  background: var(--dsw-alias-button-elevated-fill);\n  color: inherit;\n  outline: none;\n}\n.Rows_sessionRow .Rows_title {\n  flex: 1;\n}\n.Rows_sessionRow .Rows_title[data-scrolled] {\n  mask-image:\n    linear-gradient(\n      to right,\n      transparent,\n      #000 12px);\n}\n.Rows_sessionRow .Rows_title[data-clipped] {\n  mask-image:\n    linear-gradient(\n      to left,\n      transparent,\n      #000 12px);\n}\n.Rows_sessionRow .Rows_title[data-scrolled][data-clipped] {\n  mask-image:\n    linear-gradient(\n      to right,\n      transparent,\n      #000 12px,\n      #000 calc(100% - 12px),\n      transparent);\n}\n.Rows_meta {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: var(--dsh-sidebar-meta-size, 12px);\n  line-height: 16px;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_workspaceChip {\n  flex: none;\n  max-width: 72px;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: var(--dsh-sidebar-time-size, 10px);\n  line-height: 16px;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_time {\n  flex: none;\n  font-size: var(--dsh-sidebar-time-size, 10px);\n  line-height: 16px;\n  color: var(--dsw-alias-label-tertiary);\n  margin-inline-end: -1px;\n}\n.Rows_pinIndicator {\n  display: inline-flex;\n  flex: none;\n  width: 16px;\n  height: 20px;\n  align-items: center;\n  justify-content: center;\n  margin-left: 6px;\n  color: var(--dsw-alias-label-caption);\n}\n.Rows_sessionRow.Rows_archived .Rows_title,\n.Rows_searchResultRow.Rows_archived .Rows_searchResultTitle,\n.Rows_searchResultRow.Rows_archived .Rows_searchResultWorkspace,\n.Rows_searchResultRow.Rows_archived .Rows_searchResultSnippet {\n  color: var(--dsw-alias-label-caption);\n}\n.Rows_dot {\n  flex: none;\n}\n.Rows_rowActions {\n  flex: none;\n  display: none;\n  align-items: center;\n  gap: 13px;\n}\n@media (hover: hover) {\n  .Rows_projectRow:hover .Rows_rowActions,\n  .Rows_searchResultRow:hover .Rows_rowActions {\n    display: inline-flex;\n  }\n}\n.Rows_projectRow.Rows_menuOpen .Rows_rowActions {\n  display: inline-flex;\n}\n.Rows_rowQuickActions {\n  display: contents;\n}\n.Rows_searchResultHeading .Rows_rowActions {\n  margin-left: auto;\n}\n.Rows_rowResting {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  gap: 6px;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_rowResting .Rows_pinIndicator {\n  margin-left: 0;\n}\n@media (hover: hover) {\n  .Rows_sessionRow:hover {\n    background-color: var(--dsw-alias-interactive-bg-hover);\n  }\n  .Rows_sessionRow:hover .Rows_rowActions,\n  .Rows_sessionRow.Rows_menuOpen .Rows_rowActions,\n  html[data-input-modality=keyboard] .Rows_sessionRow:focus-within .Rows_rowActions {\n    display: inline-flex;\n  }\n  .Rows_sessionRow:hover .Rows_rowResting,\n  .Rows_sessionRow.Rows_menuOpen .Rows_rowResting,\n  html[data-input-modality=keyboard] .Rows_sessionRow:focus-within .Rows_rowResting {\n    display: none;\n  }\n  .Rows_sessionRow:hover .Rows_title,\n  .Rows_sessionRow.Rows_menuOpen .Rows_title {\n    text-overflow: clip;\n  }\n}\n@media (hover: none) {\n  .Rows_projectRow .Rows_rowActions,\n  .Rows_searchResultRow .Rows_rowActions,\n  .Rows_sessionRow .Rows_rowActions {\n    display: inline-flex;\n  }\n  .Rows_sessionRow .Rows_timestamp,\n  .Rows_sessionRow:has(.Rows_pinnedAction) .Rows_pinIndicator,\n  .Rows_sessionRow .Rows_rowQuickActions > [data-slot] > :not(.Rows_pinnedAction),\n  .Rows_projectRow[aria-expanded=false] .Rows_rowActions {\n    display: none;\n  }\n  .Rows_sessionRow .Rows_pinnedAction {\n    order: -1;\n  }\n}\n.Rows_projectRow.Rows_menuOpen,\n.Rows_sessionRow.Rows_menuOpen {\n  background-color: var(--dsw-alias-interactive-bg-hover);\n}\n.Rows_sessionRow.Rows_dropBefore,\n.Rows_sessionRow.Rows_dropAfter {\n  position: relative;\n}\n.Rows_sessionRow.Rows_dropBefore::before,\n.Rows_sessionRow.Rows_dropAfter::after {\n  content: \"\";\n  position: absolute;\n  z-index: 1;\n  left: calc(-1 * var(--dsh-sidebar-paint-inset));\n  right: calc(4px - var(--dsh-sidebar-paint-inset));\n  height: 12px;\n  background:\n    linear-gradient(\n      55deg,\n      transparent calc(50% - 1px),\n      var(--dsw-alias-state-business-primary) calc(50% - 1px) calc(50% + 1px),\n      transparent calc(50% + 1px)) 0 0 / 5px 7px no-repeat,\n    linear-gradient(\n      125deg,\n      transparent calc(50% - 1px),\n      var(--dsw-alias-state-business-primary) calc(50% - 1px) calc(50% + 1px),\n      transparent calc(50% + 1px)) 0 5px / 5px 7px no-repeat,\n    linear-gradient(var(--dsw-alias-state-business-primary) 0 0) 4px 5px / calc(100% - 4px) 2px no-repeat;\n  pointer-events: none;\n}\n.Rows_sessionRow.Rows_dropBefore::before {\n  top: -7px;\n}\n.Rows_sessionRow.Rows_dropAfter::after {\n  bottom: -7px;\n}\n.Rows_hoverContent {\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n}\n.Rows_hoverTitle {\n  font-size: 14px;\n  line-height: 20px;\n  color: var(--dsw-alias-hovercard-label-primary);\n  overflow-wrap: break-word;\n}\n.Rows_hoverPath {\n  font-size: 12px;\n  line-height: 16px;\n  color: var(--dsw-alias-hovercard-label-secondary);\n  word-break: break-all;\n}\n.Rows_hoverTime {\n  font-size: 12px;\n  line-height: 16px;\n  color: var(--dsw-alias-hovercard-label-secondary);\n}\n.Rows_hoverStatus {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  font-size: 12px;\n  line-height: 20px;\n  color: var(--dsw-alias-hovercard-label-tertiary);\n}\n.Rows_hoverArchived svg {\n  flex-shrink: 0;\n  margin: 0 -4px;\n}\n.Rows_iconButton {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 24px;\n  height: 24px;\n  margin: -4px;\n  border: none;\n  border-radius: var(--dsw-radius-xs);\n  padding: 0;\n  background: transparent;\n  cursor: pointer;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_iconButton:focus-visible {\n  outline-offset: -2px;\n}\n@media (hover: hover) {\n  .Rows_iconButton:hover {\n    color: var(--dsw-alias-label-primary);\n  }\n}\n.Rows_chevron {\n  color: var(--dsw-alias-label-caption);\n}\n.Rows_bucketRow .Rows_chevron {\n  display: inline-flex;\n}\n.Rows_bucketRow .Rows_title {\n  color: var(--dsw-alias-label-secondary);\n}\n@media (prefers-reduced-motion: reduce) {\n  .Rows_arrow {\n    animation: none;\n    transition: none;\n  }\n}\n\n/* src/browser/WorkspacePicker.module.css */\n.WorkspacePicker_modalAction {\n  min-width: 72px;\n}\n.WorkspacePicker_modalError,\n.WorkspacePicker_menuStatus {\n  margin-top: 8px;\n  font-size: 12px;\n  line-height: 18px;\n}\n.WorkspacePicker_modalError {\n  color: var(--dsw-alias-state-error-primary);\n}\n.WorkspacePicker_menuStatus,\n.WorkspacePicker_pathSuffix {\n  color: var(--dsw-alias-label-secondary);\n}\n.WorkspacePicker_disambiguated {\n  display: flex;\n  gap: 4px;\n  min-width: 0;\n}\n.WorkspacePicker_title,\n.WorkspacePicker_pathSuffix {\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.WorkspacePicker_pathSuffix {\n  flex: none;\n  max-width: 75%;\n}\n"
+  el.textContent = "/* src/browser/rows/AppearanceDialogs.module.css */\n.AppearanceDialogs_panel {\n  position: fixed;\n  z-index: 1200;\n  box-sizing: border-box;\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  width: 272px;\n  padding: 6px;\n  border-radius: var(--dsw-radius-md);\n  background: var(--dsw-menu-surface-fill, var(--dsw-alias-bg-layer-2));\n  backdrop-filter: var(--dsw-menu-backdrop-filter, blur(20px));\n  box-shadow: var(--dsw-elevation-prominent);\n  color: var(--dsw-alias-label-primary);\n  outline: none;\n}\n.AppearanceDialogs_head {\n  display: flex;\n  align-items: baseline;\n  gap: 6px;\n  min-width: 0;\n  padding: 2px 4px 0;\n}\n.AppearanceDialogs_headTitle {\n  flex: none;\n  color: var(--dsw-alias-label-primary);\n  font-size: 12px;\n  font-weight: 600;\n  line-height: 16px;\n}\n.AppearanceDialogs_headScope {\n  min-width: 0;\n  overflow: hidden;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n  line-height: 16px;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n.AppearanceDialogs_toolbar {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.AppearanceDialogs_tabs {\n  display: flex;\n  flex: none;\n  gap: 2px;\n  padding: 2px;\n  border-radius: var(--dsw-radius-sm);\n  background: var(--dsw-alias-interactive-bg-hover);\n}\n.AppearanceDialogs_tab {\n  height: 22px;\n  padding: 0 8px;\n  border: 0;\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  font: inherit;\n  font-size: 11px;\n  line-height: 16px;\n  cursor: pointer;\n}\n.AppearanceDialogs_tabOn {\n  background: var(--dsw-alias-bg-layer-1);\n  box-shadow: var(--dsw-elevation-soft);\n  color: var(--dsw-alias-label-primary);\n}\n.AppearanceDialogs_search {\n  flex: 1;\n  min-width: 0;\n  height: 24px;\n  padding: 0 6px;\n  border: 0.5px solid var(--dsw-alias-border-l2);\n  border-radius: var(--dsw-radius-sm);\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-primary);\n  font: inherit;\n  font-size: 11px;\n}\n.AppearanceDialogs_scroll {\n  max-height: 224px;\n  margin: 0 -4px;\n  padding: 0 4px;\n  overflow-y: auto;\n  overscroll-behavior: contain;\n}\n.AppearanceDialogs_groupLabel {\n  margin: 6px 2px 3px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 10px;\n  font-weight: 500;\n  line-height: 14px;\n}\n.AppearanceDialogs_groupLabel:first-child {\n  margin-top: 0;\n}\n.AppearanceDialogs_grid {\n  display: grid;\n  grid-template-columns: repeat(7, 1fr);\n  gap: 2px;\n}\n.AppearanceDialogs_cell {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  height: 30px;\n  min-width: 0;\n  padding: 0;\n  border: 0;\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  font-size: 16px;\n  line-height: 1;\n  cursor: pointer;\n}\n.AppearanceDialogs_cellOn {\n  background: var(--dsw-alias-interactive-bg-hover);\n  box-shadow: inset 0 0 0 1px var(--dsw-alias-state-business-primary);\n  color: var(--dsw-alias-label-primary);\n}\n.AppearanceDialogs_empty {\n  padding: 16px 8px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n  text-align: center;\n}\n.AppearanceDialogs_footer {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  padding-top: 6px;\n  border-top: 0.5px solid var(--dsw-alias-border-l1);\n}\n.AppearanceDialogs_textButton {\n  height: 24px;\n  padding: 0 6px;\n  border: 0;\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  font: inherit;\n  font-size: 11px;\n  cursor: pointer;\n}\n.AppearanceDialogs_currentGlyph {\n  display: inline-flex;\n  align-items: center;\n  margin-inline-start: auto;\n  color: var(--dsw-alias-label-tertiary);\n}\n.AppearanceDialogs_primaryButton {\n  height: 24px;\n  padding: 0 12px;\n  border: 0;\n  border-radius: var(--dsw-radius-sm);\n  background: var(--dsw-alias-label-primary);\n  color: var(--dsw-alias-bg-base);\n  font: inherit;\n  font-size: 11px;\n  font-weight: 600;\n  cursor: pointer;\n}\n.AppearanceDialogs_swatches {\n  display: grid;\n  grid-template-columns: repeat(5, 1fr);\n  gap: 6px;\n  padding: 2px 0;\n}\n.AppearanceDialogs_swatchButton {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  height: 34px;\n  border: 0;\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  cursor: pointer;\n}\n.AppearanceDialogs_swatch {\n  width: 20px;\n  height: 20px;\n  border-radius: 50%;\n}\n.AppearanceDialogs_swatchOn {\n  background: var(--dsw-alias-interactive-bg-hover);\n  box-shadow: inset 0 0 0 1.5px var(--dsw-alias-label-primary);\n}\n.AppearanceDialogs_tagList {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  max-height: 92px;\n  margin: 0 -2px;\n  padding: 0 2px;\n  overflow-y: auto;\n  overscroll-behavior: contain;\n}\n.AppearanceDialogs_tagChip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  max-width: 100%;\n  height: 22px;\n  padding: 0 8px;\n  border: 0;\n  border-radius: 999px;\n  background: var(--dsw-alias-interactive-bg-hover);\n  color: var(--dsw-alias-label-secondary);\n  font: inherit;\n  font-size: 11px;\n  line-height: 16px;\n  cursor: pointer;\n}\n.AppearanceDialogs_tagChipOn {\n  box-shadow: inset 0 0 0 1px var(--dsw-alias-label-primary);\n  color: var(--dsw-alias-label-primary);\n}\n.AppearanceDialogs_tagChipDot {\n  flex: none;\n  width: 8px;\n  height: 8px;\n  border-radius: 50%;\n}\n.AppearanceDialogs_tagChipLabel {\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}\n.AppearanceDialogs_nameRow {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.AppearanceDialogs_nameLabel {\n  flex: none;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 11px;\n  line-height: 16px;\n}\n.AppearanceDialogs_nameInput {\n  flex: 1;\n  min-width: 0;\n  height: 26px;\n  padding: 0 8px;\n  border: 0.5px solid var(--dsw-alias-border-l2);\n  border-radius: var(--dsw-radius-sm);\n  background: var(--dsw-alias-bg-layer-1);\n  color: var(--dsw-alias-label-primary);\n  font: inherit;\n  font-size: 12px;\n}\n.AppearanceDialogs_nameInput::placeholder {\n  color: var(--dsw-alias-label-tertiary);\n}\n@media (hover: hover) {\n  .AppearanceDialogs_tab:hover,\n  .AppearanceDialogs_textButton:hover,\n  .AppearanceDialogs_tagChip:hover {\n    color: var(--dsw-alias-label-primary);\n  }\n  .AppearanceDialogs_cell:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n    color: var(--dsw-alias-label-primary);\n  }\n  .AppearanceDialogs_swatchButton:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.AppearanceDialogs_tab:focus-visible,\n.AppearanceDialogs_cell:focus-visible,\n.AppearanceDialogs_swatchButton:focus-visible,\n.AppearanceDialogs_tagChip:focus-visible,\n.AppearanceDialogs_nameInput:focus-visible,\n.AppearanceDialogs_textButton:focus-visible,\n.AppearanceDialogs_primaryButton:focus-visible,\n.AppearanceDialogs_search:focus-visible {\n  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));\n  outline-offset: -2px;\n}\n\n/* src/browser/rows/WorkspaceBrowser.module.css */\n.WorkspaceBrowser_root {\n  --workspace-toolbar-height: 36px;\n  --workspace-toolbar-gap: 0px;\n  position: relative;\n  flex: 1;\n  min-height: 0;\n  display: flex;\n  flex-direction: column;\n  box-sizing: border-box;\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) {\n  flex: none;\n  max-height: 100cqh;\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail):has(.WorkspaceBrowser_searchExpanded) {\n  height: 100cqh;\n}\n.WorkspaceBrowser_iconButton {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 28px;\n  height: 28px;\n  border: none;\n  border-radius: var(--dsw-radius-sm);\n  padding: 0;\n  background: transparent;\n  cursor: pointer;\n  color: var(--dsw-alias-label-secondary);\n}\n.WorkspaceBrowser_iconButton:focus-visible,\n.WorkspaceBrowser_searchButton:focus-visible,\n.WorkspaceBrowser_clearButton:focus-visible {\n  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));\n  outline-offset: -2px;\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_iconButton:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.WorkspaceBrowser_viewOptionsMenu {\n  min-width: 200px;\n}\n.WorkspaceBrowser_textScaleRow {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  min-height: 30px;\n  padding: 4px 8px;\n  font-size: 13px;\n  line-height: 20px;\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_textScaleLabel {\n  flex: none;\n}\n.WorkspaceBrowser_textScaleTrack {\n  display: flex;\n  flex: none;\n  gap: 2px;\n  margin-inline-start: auto;\n  padding: 2px;\n  border-radius: var(--dsw-radius-md);\n  background: var(--dsw-alias-interactive-bg-hover);\n}\n.WorkspaceBrowser_textScaleOption {\n  height: 22px;\n  padding: 0 8px;\n  border: 0;\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  color: var(--dsw-alias-label-secondary);\n  font: inherit;\n  font-size: 12px;\n  line-height: 18px;\n  white-space: nowrap;\n  cursor: pointer;\n  transition: color 120ms ease;\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_textScaleOption:hover {\n    color: var(--dsw-alias-label-primary);\n  }\n}\n.WorkspaceBrowser_textScaleOptionOn {\n  background: var(--dsw-alias-bg-layer-1);\n  box-shadow: var(--dsw-elevation-soft);\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_textScaleOption:focus-visible {\n  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));\n  outline-offset: -2px;\n}\n.WorkspaceBrowser_sectionHeader {\n  flex: none;\n  display: flex;\n  align-items: center;\n  justify-content: flex-end;\n  gap: 4px;\n  height: var(--workspace-toolbar-height);\n  padding-left: var(--dsh-sidebar-row-padding);\n  margin-bottom: var(--workspace-toolbar-gap);\n  box-sizing: border-box;\n  border-radius: var(--dsw-radius-md);\n  overflow: hidden;\n  color: var(--dsw-alias-label-tertiary);\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_sectionHeader.WorkspaceBrowser_searchSpacingMotion {\n  transition:\n    margin-right 180ms var(--ds-ease-in-out),\n    padding-inline 180ms var(--ds-ease-in-out),\n    gap 180ms var(--ds-ease-in-out);\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_sectionHeader:not(:has(.WorkspaceBrowser_searchExpanded)) {\n  margin-right: -4px;\n  padding-right: 1px;\n}\n.WorkspaceBrowser_sectionLabel {\n  position: relative;\n  left: -1px;\n  flex: none;\n  max-width: 45%;\n  min-width: 0;\n  overflow: hidden;\n  white-space: nowrap;\n  line-height: 20px;\n  opacity: 1;\n  visibility: visible;\n  transition:\n    max-width 180ms var(--ds-ease-in-out),\n    margin-right 180ms var(--ds-ease-in-out),\n    opacity 120ms var(--ds-ease-in-out),\n    transform 180ms var(--ds-ease-in-out),\n    visibility 0s linear;\n}\n.WorkspaceBrowser_sectionLabelHidden {\n  max-width: 0;\n  margin-right: -4px;\n  opacity: 0;\n  transform: translateX(-4px);\n  visibility: hidden;\n  transition-delay:\n    0s,\n    0s,\n    0s,\n    0s,\n    180ms;\n}\n.WorkspaceBrowser_searchSlot {\n  flex: 1;\n  max-width: 28px;\n  min-width: 0;\n  display: flex;\n  align-items: center;\n  margin-left: auto;\n  padding-left: 0;\n  box-sizing: border-box;\n  transition: max-width 180ms var(--ds-ease-in-out), padding-left 180ms var(--ds-ease-in-out);\n}\n.WorkspaceBrowser_searchSlotExpanded {\n  max-width: 100%;\n  padding-left: 0;\n}\n.WorkspaceBrowser_headerActions {\n  flex: none;\n  display: flex;\n  align-items: center;\n  gap: 4px;\n  max-width: 60px;\n  opacity: 1;\n  overflow: hidden;\n  visibility: visible;\n  transition:\n    max-width 180ms var(--ds-ease-in-out),\n    opacity 120ms var(--ds-ease-in-out),\n    transform 180ms var(--ds-ease-in-out),\n    visibility 0s linear;\n}\n.WorkspaceBrowser_headerActionsHidden {\n  max-width: 0;\n  opacity: 0;\n  transform: translateX(4px);\n  visibility: hidden;\n  pointer-events: none;\n  transition-delay:\n    0s,\n    0s,\n    0s,\n    180ms;\n}\n.WorkspaceBrowser_search {\n  flex: none;\n  display: flex;\n  align-items: center;\n  gap: 0;\n  width: 100%;\n  height: 28px;\n  margin: 0;\n  padding: 0;\n  box-sizing: border-box;\n  border: none;\n  border-radius: var(--dsw-radius-sm);\n  background: transparent;\n  cursor: text;\n  color: var(--dsw-alias-label-secondary);\n  overflow: hidden;\n  transition:\n    width 180ms var(--ds-ease-in-out),\n    padding 180ms var(--ds-ease-in-out),\n    border-color 180ms var(--ds-ease-in-out),\n    background-color 180ms var(--ds-ease-in-out);\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_sectionHeader:has(.WorkspaceBrowser_searchExpanded) {\n  margin-right: 0;\n  padding-inline: calc(var(--dsh-sidebar-paint-inset) + 1px);\n  gap: 0;\n}\n.WorkspaceBrowser_sectionHeader:has(.WorkspaceBrowser_searchExpanded) .WorkspaceBrowser_sectionLabelHidden {\n  margin-right: 0;\n}\n.WorkspaceBrowser_searchExpanded {\n  width: 100%;\n  height: 32px;\n  margin-inline: 0;\n  padding: 0 4px 0 0;\n  border: 0.5px solid var(--dsw-alias-border-l4);\n  border-radius: var(--dsw-radius-md);\n  background: transparent;\n  color: var(--dsw-alias-label-caption);\n}\n.WorkspaceBrowser_searchButton {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 28px;\n  height: 28px;\n  border: none;\n  border-radius: var(--dsw-radius-sm);\n  padding: 0;\n  background: transparent;\n  cursor: pointer;\n  color: inherit;\n}\n.WorkspaceBrowser_searchExpanded .WorkspaceBrowser_searchButton {\n  width: 28px;\n  height: 32px;\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_searchButton:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n  .WorkspaceBrowser_searchExpanded .WorkspaceBrowser_searchButton:hover {\n    background: transparent;\n  }\n}\n.WorkspaceBrowser_searchInput {\n  flex: 1;\n  width: 0;\n  min-width: 0;\n  border: none;\n  outline: none;\n  background: transparent;\n  opacity: 0;\n  pointer-events: none;\n  font-size: 13px;\n  line-height: 18px;\n  color: var(--dsw-alias-label-primary);\n  transition: opacity 120ms var(--ds-ease-in-out);\n}\n.WorkspaceBrowser_searchExpanded .WorkspaceBrowser_searchInput {\n  margin-left: -2px;\n  opacity: 1;\n  pointer-events: auto;\n}\n.WorkspaceBrowser_searchInput::placeholder {\n  color: var(--dsw-alias-label-tertiary);\n}\n.WorkspaceBrowser_clearButton {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 24px;\n  height: 24px;\n  border: none;\n  border-radius: var(--dsw-radius-sm);\n  padding: 0;\n  background: transparent;\n  cursor: pointer;\n  color: var(--dsw-alias-label-secondary);\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_clearButton:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.WorkspaceBrowser_rail .WorkspaceBrowser_sectionHeader {\n  gap: 0;\n  padding-left: 0;\n  margin-bottom: 12px;\n  justify-content: flex-start;\n}\n.WorkspaceBrowser_rail .WorkspaceBrowser_headerActions {\n  max-width: none;\n}\n.WorkspaceBrowser_rail .WorkspaceBrowser_iconButton {\n  width: 36px;\n  height: 36px;\n  border-radius: var(--dsw-radius-md);\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_rail .WorkspaceBrowser_search {\n  width: 36px;\n  height: 36px;\n  padding: 0;\n  margin: 0 0 12px;\n  gap: 0;\n  border-radius: var(--dsw-radius-md);\n  border-color: transparent;\n  background: transparent;\n}\n.WorkspaceBrowser_rail .WorkspaceBrowser_searchButton {\n  width: 36px;\n  height: 36px;\n  border-radius: var(--dsw-radius-md);\n  color: var(--dsw-alias-label-primary);\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_rail .WorkspaceBrowser_searchButton:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.WorkspaceBrowser_statusTabs {\n  flex: none;\n  display: flex;\n  align-items: center;\n  gap: 2px;\n  height: 28px;\n  padding-inline: var(--dsh-sidebar-row-padding);\n  margin-bottom: 2px;\n  overflow-x: auto;\n  scrollbar-width: none;\n}\n.WorkspaceBrowser_statusTabs::-webkit-scrollbar {\n  display: none;\n}\n.WorkspaceBrowser_statusTab {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  gap: 4px;\n  height: 22px;\n  padding-inline: 8px;\n  border: none;\n  border-radius: var(--dsw-radius-md);\n  background: transparent;\n  color: var(--dsw-alias-label-tertiary);\n  font: inherit;\n  font-size: 12px;\n  line-height: 22px;\n  cursor: pointer;\n}\n.WorkspaceBrowser_statusTab:focus-visible {\n  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));\n  outline-offset: -1px;\n}\n.WorkspaceBrowser_statusTabActive,\n.WorkspaceBrowser_statusTabActive:focus-visible {\n  background: var(--dsw-alias-interactive-bg-hover);\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_statusTabCount {\n  font-variant-numeric: tabular-nums;\n  color: var(--dsw-alias-label-caption);\n}\n.WorkspaceBrowser_statusTabActive .WorkspaceBrowser_statusTabCount {\n  color: var(--dsw-alias-label-secondary);\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_statusTab:hover {\n    background: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.WorkspaceBrowser_listArea {\n  flex: 1;\n  min-height: 0;\n  display: flex;\n  flex-direction: column;\n  overflow: visible;\n}\n.WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_listArea {\n  display: block;\n  margin-left: -4px;\n  margin-right: calc(2px - var(--dsh-sidebar-inline-padding));\n  padding-left: 4px;\n  padding-right: calc(var(--dsh-sidebar-inline-padding) - var(--dsh-scrollbar-width) - 2px);\n  overflow-x: hidden;\n  overflow-y: auto;\n  scrollbar-gutter: stable;\n}\n@container scroll-state(scrollable: bottom) {\n  .WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_listArea {\n    overflow-y: hidden;\n  }\n}\n.WorkspaceBrowser_treeBody {\n  flex: 1;\n  min-height: 0;\n  display: flex;\n  flex-direction: column;\n  position: relative;\n}\n.WorkspaceBrowser_wide {\n  animation: WorkspaceBrowser_wide-in 200ms var(--ds-ease-in-out);\n}\n@keyframes WorkspaceBrowser_wide-in {\n  from {\n    opacity: 0;\n  }\n}\n.WorkspaceBrowser_list {\n  flex: 1;\n  min-height: 0;\n  overflow: visible;\n  padding-bottom: 16px;\n}\n.WorkspaceBrowser_flatList > * + *,\n.WorkspaceBrowser_searchTree > [role=treeitem] + [role=treeitem],\n.WorkspaceBrowser_groupSection > * + * {\n  margin-top: var(--dsh-sidebar-row-gap, 2px);\n}\n.WorkspaceBrowser_searchStatus {\n  padding: 10px 12px;\n  font-size: 12px;\n  line-height: 18px;\n  color: var(--dsw-alias-label-tertiary);\n}\n.WorkspaceBrowser_skeletonRow {\n  display: flex;\n  align-items: flex-start;\n  gap: var(--dsh-sidebar-label-gap);\n  box-sizing: border-box;\n  min-height: 48px;\n  padding: 6px var(--dsh-sidebar-row-padding) 7px;\n}\n.WorkspaceBrowser_skeletonDot {\n  flex: none;\n  width: 16px;\n  height: 16px;\n  border-radius: 50%;\n  corner-shape: round;\n}\n.WorkspaceBrowser_skeletonBars {\n  flex: 1;\n  min-width: 0;\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n}\n.WorkspaceBrowser_skeletonDot,\n.WorkspaceBrowser_skeletonBar {\n  background: var(--dsw-alias-bg-skeleton);\n  animation: WorkspaceBrowser_search-skeleton 2s cubic-bezier(0.36, 0, 0.64, 1) infinite;\n}\n.WorkspaceBrowser_skeletonBar {\n  width: 65%;\n  height: 16px;\n  border-radius: var(--dsw-radius-xs);\n}\n.WorkspaceBrowser_skeletonBarWide {\n  width: 90%;\n  height: 13px;\n}\n@keyframes WorkspaceBrowser_search-skeleton {\n  0% {\n    opacity: 1;\n  }\n  40% {\n    opacity: 0.6;\n  }\n  80%, 100% {\n    opacity: 1;\n  }\n}\n.WorkspaceBrowser_groupSection {\n  position: relative;\n}\n.WorkspaceBrowser_groupSection + .WorkspaceBrowser_groupSection {\n  margin-top: var(--dsh-sidebar-group-gap, 4px);\n}\n.WorkspaceBrowser_listTopDropIndicator,\n.WorkspaceBrowser_workspaceDropBefore::before,\n.WorkspaceBrowser_workspaceDropAfter::after {\n  content: \"\";\n  position: absolute;\n  z-index: 1;\n  left: 0;\n  right: 0;\n  height: 12px;\n  background:\n    linear-gradient(\n      55deg,\n      transparent calc(50% - 1px),\n      var(--dsw-alias-state-business-primary) calc(50% - 1px) calc(50% + 1px),\n      transparent calc(50% + 1px)) 0 0 / 5px 7px no-repeat,\n    linear-gradient(\n      125deg,\n      transparent calc(50% - 1px),\n      var(--dsw-alias-state-business-primary) calc(50% - 1px) calc(50% + 1px),\n      transparent calc(50% + 1px)) 0 5px / 5px 7px no-repeat,\n    linear-gradient(var(--dsw-alias-state-business-primary) 0 0) 4px 5px / calc(100% - 4px) 2px no-repeat;\n  pointer-events: none;\n}\n.WorkspaceBrowser_listTopDropIndicator {\n  top: -8px;\n}\n.WorkspaceBrowser_listTopDropActive > .WorkspaceBrowser_workspaceDropBefore:first-child::before {\n  display: none;\n}\n.WorkspaceBrowser_workspaceDropBefore::before {\n  top: -8px;\n}\n.WorkspaceBrowser_workspaceDropAfter::after {\n  bottom: -8px;\n}\n.WorkspaceBrowser_sessionOverflowButton {\n  width: 100%;\n  height: var(--dsh-sidebar-row-height, 28px);\n  border: none;\n  border-radius: var(--dsw-radius-sm);\n  padding: 0 var(--dsh-sidebar-row-padding) 0 calc(var(--dsh-sidebar-row-padding) + 16px + var(--dsh-sidebar-label-gap) + var(--dsh-workspace-indent, 0px));\n  background: transparent;\n  cursor: pointer;\n  text-align: left;\n  font-size: var(--dsh-sidebar-meta-size, 12px);\n  color: var(--dsw-alias-label-tertiary);\n}\n.WorkspaceBrowser_groupSection > .WorkspaceBrowser_sessionOverflowButton {\n  margin-top: 0;\n}\n@media (hover: hover) {\n  .WorkspaceBrowser_sessionOverflowButton:hover {\n    background: transparent;\n    color: var(--dsw-alias-label-secondary);\n  }\n}\n.WorkspaceBrowser_empty {\n  padding: 16px 12px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 13px;\n}\n.WorkspaceBrowser_emptyState {\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  gap: 8px;\n  margin-top: 80px;\n  padding: 0 12px;\n  color: var(--dsw-alias-label-tertiary);\n  font-size: 13px;\n  line-height: 20px;\n}\n.WorkspaceBrowser_emptyState > svg {\n  margin-bottom: 4px;\n  color: var(--dsw-alias-label-caption);\n}\n.WorkspaceBrowser_emptyAction {\n  padding: 0;\n  border: none;\n  background: none;\n  cursor: pointer;\n  font-size: 13px;\n  line-height: 20px;\n  color: var(--dsw-alias-link);\n}\n.WorkspaceBrowser_renameInput {\n  box-sizing: border-box;\n  width: 100%;\n  height: 44px;\n  padding: 7px 14px;\n  border: 0.5px solid var(--dsw-alias-border-l4);\n  border-radius: var(--dsw-radius-lg);\n  outline: none;\n  background: transparent;\n  font-size: 14px;\n  font-weight: 400;\n  line-height: 22px;\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_renameInput:disabled {\n  color: var(--dsw-alias-label-dimmed);\n}\n.WorkspaceBrowser_renameError {\n  margin-top: 8px;\n  font-size: 12px;\n  line-height: 18px;\n  color: var(--dsw-alias-state-error-primary);\n}\n.WorkspaceBrowser_deleteAction:not(:disabled) {\n  color: var(--dsw-alias-state-error-primary);\n}\n.WorkspaceBrowser_deleteStatus {\n  font-size: 12px;\n  line-height: 18px;\n  color: var(--dsw-alias-label-secondary);\n}\n.WorkspaceBrowser_archiveActivity {\n  margin: 0 0 8px;\n  padding-left: 18px;\n  font-size: 13px;\n  line-height: 20px;\n  color: var(--dsw-alias-label-primary);\n}\n.WorkspaceBrowser_archiveActivity li {\n  overflow-wrap: anywhere;\n}\n@media (pointer: coarse) {\n  .WorkspaceBrowser_searchInput,\n  .WorkspaceBrowser_renameInput {\n    font-size: 16px;\n  }\n}\n@media (prefers-reduced-motion: reduce) {\n  .WorkspaceBrowser_wide {\n    animation: none;\n  }\n  .WorkspaceBrowser_skeletonDot,\n  .WorkspaceBrowser_skeletonBar {\n    animation: none;\n  }\n  .WorkspaceBrowser_root:not(.WorkspaceBrowser_rail) .WorkspaceBrowser_sectionHeader.WorkspaceBrowser_searchSpacingMotion,\n  .WorkspaceBrowser_search,\n  .WorkspaceBrowser_sectionLabel,\n  .WorkspaceBrowser_searchSlot,\n  .WorkspaceBrowser_searchInput,\n  .WorkspaceBrowser_headerActions {\n    transition: none;\n  }\n}\n\n/* src/browser/rows/Rows.module.css */\n.Rows_projectRow,\n.Rows_sessionRow {\n  display: flex;\n  align-items: center;\n  gap: var(--dsh-sidebar-label-gap);\n  border-radius: var(--dsw-radius-md);\n  border-inline: var(--dsh-sidebar-paint-inset) solid transparent;\n  background-clip: padding-box;\n  box-sizing: border-box;\n  padding: 0 8px;\n  padding-inline-start: calc(var(--dsh-sidebar-row-padding) - var(--dsh-sidebar-paint-inset) + var(--dsh-workspace-indent, 0px));\n  cursor: pointer;\n  -webkit-user-select: none;\n  user-select: none;\n  color: var(--dsw-alias-label-primary);\n}\n@media (hover: hover) {\n  .Rows_projectRow:hover {\n    background-color: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.Rows_sessionRow.Rows_selected {\n  background-color: var(--dsw-alias-interactive-bg-hover);\n}\n.Rows_dragPreview {\n  background: var(--dsw-specific-sidebar-fill);\n}\n.Rows_searchResultRow {\n  display: flex;\n  flex-direction: column;\n  align-items: stretch;\n  width: 100%;\n  min-height: 48px;\n  box-sizing: border-box;\n  border: none;\n  border-radius: var(--dsw-radius-lg);\n  padding: 4px calc(var(--dsh-sidebar-row-padding) - var(--dsh-sidebar-paint-inset));\n  border-inline: var(--dsh-sidebar-paint-inset) solid transparent;\n  background: transparent;\n  background-clip: padding-box;\n  cursor: pointer;\n  text-align: left;\n  color: var(--dsw-alias-label-primary);\n}\n@media (hover: hover) {\n  .Rows_searchResultRow:hover {\n    background-color: var(--dsw-alias-interactive-bg-hover);\n  }\n}\n.Rows_searchResultRow.Rows_selected {\n  background-color: var(--dsw-alias-interactive-bg-hover);\n}\n.Rows_searchResultHeading {\n  display: flex;\n  align-items: center;\n  min-width: 0;\n}\n.Rows_searchResultTitle {\n  flex: 0 1 auto;\n  min-width: 0;\n  margin: 0 var(--dsh-sidebar-label-gap);\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: var(--dsh-sidebar-title-size, 14px);\n  line-height: var(--dsh-sidebar-title-line, 20px);\n}\n.Rows_searchResultMeta {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  min-width: 0;\n  margin-left: calc(16px + var(--dsh-sidebar-label-gap));\n}\n.Rows_searchResultWorkspace,\n.Rows_searchResultSnippet {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: var(--dsh-sidebar-meta-size, 12px);\n  line-height: 17px;\n}\n.Rows_searchResultWorkspace {\n  flex: none;\n  max-width: 40%;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_searchResultWorkspace:only-child {\n  max-width: 100%;\n}\n.Rows_searchResultSnippet {\n  flex: 1;\n  min-width: 0;\n  color: var(--dsw-alias-label-secondary);\n}\n.Rows_projectRow {\n  height: var(--dsh-sidebar-row-height, 28px);\n  align-items: center;\n  box-sizing: border-box;\n}\n.Rows_projectRow .Rows_rowActions {\n  height: 20px;\n}\n.Rows_sessionRow {\n  height: var(--dsh-sidebar-row-height, 28px);\n  gap: 0;\n}\n.Rows_sessionRow .Rows_title {\n  margin: 0 6px 0 var(--dsh-sidebar-label-gap);\n}\n.Rows_slot {\n  flex: none;\n  width: 16px;\n  height: 20px;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_visuallyHidden {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  overflow: hidden;\n  clip: rect(0 0 0 0);\n  white-space: nowrap;\n}\n.Rows_folderActive {\n  color: var(--dsw-alias-state-business-primary);\n}\n.Rows_folderCustom {\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_tagMarker {\n  position: relative;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 16px;\n  height: 16px;\n}\n.Rows_tagMarkerDot {\n  width: 8px;\n  height: 8px;\n  border-radius: 50%;\n}\n.Rows_tagMarkerRing {\n  position: absolute;\n  inset: 1px;\n  border: 1.5px solid var(--dsw-alias-state-idle-primary);\n  border-radius: 50%;\n}\n.Rows_tagMarker[data-state=done] .Rows_tagMarkerRing {\n  border-color: var(--dsw-alias-state-success-primary);\n}\n.Rows_tagMarker[data-state=warning] .Rows_tagMarkerRing {\n  border-color: var(--dsw-alias-state-warn-primary);\n}\n.Rows_tagMarker[data-state=error] .Rows_tagMarkerRing {\n  border-color: var(--dsw-alias-state-error-primary);\n}\n.Rows_tagMarker[data-state=ongoing] .Rows_tagMarkerRing {\n  border-color: var(--dsw-alias-label-tertiary);\n  border-right-color: transparent;\n  animation: Rows_tagMarkerSpin 1.5s linear infinite;\n}\n@keyframes Rows_tagMarkerSpin {\n  to {\n    transform: rotate(360deg);\n  }\n}\n.Rows_bucketDot {\n  flex: none;\n  width: 8px;\n  height: 8px;\n  border-radius: 50%;\n}\n.Rows_projectRow .Rows_chevron {\n  display: none;\n}\n@media (hover: hover) {\n  .Rows_projectRow:hover .Rows_chevron {\n    display: inline-flex;\n  }\n  .Rows_projectRow:hover .Rows_folder {\n    display: none;\n  }\n}\n.Rows_arrow {\n  transition: transform 150ms var(--ds-ease-in-out);\n}\n.Rows_arrowOpen {\n  transform: rotate(90deg);\n}\n.Rows_projectText {\n  flex: 1;\n  min-width: 0;\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n}\n.Rows_title {\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: var(--dsh-sidebar-title-size, 14px);\n  line-height: var(--dsh-sidebar-title-line, 20px);\n}\n.Rows_renameInput {\n  min-width: 0;\n  font-size: var(--dsh-sidebar-title-size, 14px);\n  line-height: var(--dsh-sidebar-title-line, 20px);\n  padding: 0 2px;\n  border: 0.5px solid var(--dsw-alias-border-l4);\n  border-radius: var(--dsw-radius-sm);\n  background: var(--dsw-alias-button-elevated-fill);\n  color: inherit;\n  outline: none;\n}\n.Rows_sessionRow .Rows_title {\n  flex: 1;\n}\n.Rows_sessionRow .Rows_title[data-scrolled] {\n  mask-image:\n    linear-gradient(\n      to right,\n      transparent,\n      #000 12px);\n}\n.Rows_sessionRow .Rows_title[data-clipped] {\n  mask-image:\n    linear-gradient(\n      to left,\n      transparent,\n      #000 12px);\n}\n.Rows_sessionRow .Rows_title[data-scrolled][data-clipped] {\n  mask-image:\n    linear-gradient(\n      to right,\n      transparent,\n      #000 12px,\n      #000 calc(100% - 12px),\n      transparent);\n}\n.Rows_meta {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: var(--dsh-sidebar-meta-size, 12px);\n  line-height: 16px;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_workspaceChip {\n  flex: none;\n  max-width: 72px;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n  font-size: var(--dsh-sidebar-time-size, 10px);\n  line-height: 16px;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_time {\n  flex: none;\n  font-size: var(--dsh-sidebar-time-size, 10px);\n  line-height: 16px;\n  color: var(--dsw-alias-label-tertiary);\n  margin-inline-end: -1px;\n}\n.Rows_pinIndicator {\n  display: inline-flex;\n  flex: none;\n  width: 16px;\n  height: 20px;\n  align-items: center;\n  justify-content: center;\n  margin-left: 6px;\n  color: var(--dsw-alias-label-caption);\n}\n.Rows_sessionRow.Rows_archived .Rows_title,\n.Rows_searchResultRow.Rows_archived .Rows_searchResultTitle,\n.Rows_searchResultRow.Rows_archived .Rows_searchResultWorkspace,\n.Rows_searchResultRow.Rows_archived .Rows_searchResultSnippet {\n  color: var(--dsw-alias-label-caption);\n}\n.Rows_dot {\n  flex: none;\n}\n.Rows_rowActions {\n  flex: none;\n  display: none;\n  align-items: center;\n  gap: 13px;\n}\n@media (hover: hover) {\n  .Rows_projectRow:hover .Rows_rowActions,\n  .Rows_searchResultRow:hover .Rows_rowActions {\n    display: inline-flex;\n  }\n}\n.Rows_projectRow.Rows_menuOpen .Rows_rowActions {\n  display: inline-flex;\n}\n.Rows_rowQuickActions {\n  display: contents;\n}\n.Rows_searchResultHeading .Rows_rowActions {\n  margin-left: auto;\n}\n.Rows_rowResting {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  gap: 6px;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_rowResting .Rows_pinIndicator {\n  margin-left: 0;\n}\n@media (hover: hover) {\n  .Rows_sessionRow:hover {\n    background-color: var(--dsw-alias-interactive-bg-hover);\n  }\n  .Rows_sessionRow:hover .Rows_rowActions,\n  .Rows_sessionRow.Rows_menuOpen .Rows_rowActions,\n  html[data-input-modality=keyboard] .Rows_sessionRow:focus-within .Rows_rowActions {\n    display: inline-flex;\n  }\n  .Rows_sessionRow:hover .Rows_rowResting,\n  .Rows_sessionRow.Rows_menuOpen .Rows_rowResting,\n  html[data-input-modality=keyboard] .Rows_sessionRow:focus-within .Rows_rowResting {\n    display: none;\n  }\n  .Rows_sessionRow:hover .Rows_title,\n  .Rows_sessionRow.Rows_menuOpen .Rows_title {\n    text-overflow: clip;\n  }\n}\n@media (hover: none) {\n  .Rows_projectRow .Rows_rowActions,\n  .Rows_searchResultRow .Rows_rowActions,\n  .Rows_sessionRow .Rows_rowActions {\n    display: inline-flex;\n  }\n  .Rows_sessionRow .Rows_timestamp,\n  .Rows_sessionRow:has(.Rows_pinnedAction) .Rows_pinIndicator,\n  .Rows_sessionRow .Rows_rowQuickActions > [data-slot] > :not(.Rows_pinnedAction),\n  .Rows_projectRow[aria-expanded=false] .Rows_rowActions {\n    display: none;\n  }\n  .Rows_sessionRow .Rows_pinnedAction {\n    order: -1;\n  }\n}\n.Rows_projectRow.Rows_menuOpen,\n.Rows_sessionRow.Rows_menuOpen {\n  background-color: var(--dsw-alias-interactive-bg-hover);\n}\n.Rows_sessionRow.Rows_dropBefore,\n.Rows_sessionRow.Rows_dropAfter {\n  position: relative;\n}\n.Rows_sessionRow.Rows_dropBefore::before,\n.Rows_sessionRow.Rows_dropAfter::after {\n  content: \"\";\n  position: absolute;\n  z-index: 1;\n  left: calc(-1 * var(--dsh-sidebar-paint-inset));\n  right: calc(4px - var(--dsh-sidebar-paint-inset));\n  height: 12px;\n  background:\n    linear-gradient(\n      55deg,\n      transparent calc(50% - 1px),\n      var(--dsw-alias-state-business-primary) calc(50% - 1px) calc(50% + 1px),\n      transparent calc(50% + 1px)) 0 0 / 5px 7px no-repeat,\n    linear-gradient(\n      125deg,\n      transparent calc(50% - 1px),\n      var(--dsw-alias-state-business-primary) calc(50% - 1px) calc(50% + 1px),\n      transparent calc(50% + 1px)) 0 5px / 5px 7px no-repeat,\n    linear-gradient(var(--dsw-alias-state-business-primary) 0 0) 4px 5px / calc(100% - 4px) 2px no-repeat;\n  pointer-events: none;\n}\n.Rows_sessionRow.Rows_dropBefore::before {\n  top: -7px;\n}\n.Rows_sessionRow.Rows_dropAfter::after {\n  bottom: -7px;\n}\n.Rows_hoverContent {\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n}\n.Rows_hoverTitle {\n  font-size: 14px;\n  line-height: 20px;\n  color: var(--dsw-alias-hovercard-label-primary);\n  overflow-wrap: break-word;\n}\n.Rows_hoverPath {\n  font-size: 12px;\n  line-height: 16px;\n  color: var(--dsw-alias-hovercard-label-secondary);\n  word-break: break-all;\n}\n.Rows_hoverTime {\n  font-size: 12px;\n  line-height: 16px;\n  color: var(--dsw-alias-hovercard-label-secondary);\n}\n.Rows_hoverStatus {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  font-size: 12px;\n  line-height: 20px;\n  color: var(--dsw-alias-hovercard-label-tertiary);\n}\n.Rows_hoverArchived svg {\n  flex-shrink: 0;\n  margin: 0 -4px;\n}\n.Rows_iconButton {\n  flex: none;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 24px;\n  height: 24px;\n  margin: -4px;\n  border: none;\n  border-radius: var(--dsw-radius-xs);\n  padding: 0;\n  background: transparent;\n  cursor: pointer;\n  color: var(--dsw-alias-label-tertiary);\n}\n.Rows_iconButton:focus-visible {\n  outline-offset: -2px;\n}\n@media (hover: hover) {\n  .Rows_iconButton:hover {\n    color: var(--dsw-alias-label-primary);\n  }\n}\n.Rows_chevron {\n  color: var(--dsw-alias-label-caption);\n}\n.Rows_bucketRow .Rows_chevron {\n  display: inline-flex;\n}\n.Rows_bucketRow .Rows_title {\n  color: var(--dsw-alias-label-secondary);\n}\n@media (prefers-reduced-motion: reduce) {\n  .Rows_arrow {\n    animation: none;\n    transition: none;\n  }\n  .Rows_tagMarker[data-state=ongoing] .Rows_tagMarkerRing {\n    animation: none;\n    border-right-color: var(--dsw-alias-label-tertiary);\n  }\n}\n\n/* src/browser/WorkspacePicker.module.css */\n.WorkspacePicker_modalAction {\n  min-width: 72px;\n}\n.WorkspacePicker_modalError,\n.WorkspacePicker_menuStatus {\n  margin-top: 8px;\n  font-size: 12px;\n  line-height: 18px;\n}\n.WorkspacePicker_modalError {\n  color: var(--dsw-alias-state-error-primary);\n}\n.WorkspacePicker_menuStatus,\n.WorkspacePicker_pathSuffix {\n  color: var(--dsw-alias-label-secondary);\n}\n.WorkspacePicker_disambiguated {\n  display: flex;\n  gap: 4px;\n  min-width: 0;\n}\n.WorkspacePicker_title,\n.WorkspacePicker_pathSuffix {\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.WorkspacePicker_pathSuffix {\n  flex: none;\n  max-width: 75%;\n}\n"
   document.head.append(el)
 })();
 

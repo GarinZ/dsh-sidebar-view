@@ -557,6 +557,42 @@ export function sessionColorHex(raw: unknown): string | undefined {
   return SESSION_COLORS.find(color => color.id === raw)?.hex
 }
 
+/** Longest accepted tag name, matching the picker input's maxLength. */
+export const MAX_TAG_NAME = 24
+
+/** Named color tag; a Session points at one by id. */
+export interface TagDefinition {
+  readonly id: string
+  readonly name: string
+  readonly color: SessionColorId
+}
+
+/** Hard stop for a corrupt tag list. */
+const MAX_TAGS = 100
+const MAX_TAG_ID = 64
+
+/**
+ * Keep only tag records this build can render, so a dropped colour or a
+ * malformed entry degrades to "no tag" instead of an unpaintable dot.
+ * @param raw - the stored value.
+ * @returns a fresh, de-duplicated tag list in stored order.
+ */
+export function readTagDefinitions(raw: unknown): TagDefinition[] {
+  if (!Array.isArray(raw)) return []
+  const out: TagDefinition[] = []
+  const seen = new Set<string>()
+  for (const entry of raw) {
+    if (out.length >= MAX_TAGS) break
+    if (typeof entry !== 'object' || entry === null) continue
+    const { id, name, color } = entry as { id?: unknown; name?: unknown; color?: unknown }
+    if (typeof id !== 'string' || id === '' || id.length > MAX_TAG_ID || seen.has(id)) continue
+    if (!isSessionColorId(color)) continue
+    seen.add(id)
+    out.push({ id, name: typeof name === 'string' ? name.slice(0, MAX_TAG_NAME) : '', color })
+  }
+  return out
+}
+
 /**
  * Local, name-only icon search: the catalogue is small enough that substring
  * matching on the upstream name beats indexing every translated alias.

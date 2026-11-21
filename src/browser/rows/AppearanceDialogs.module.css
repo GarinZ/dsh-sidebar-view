@@ -214,38 +214,87 @@
   box-shadow: inset 0 0 0 1.5px var(--dsw-alias-label-primary);
 }
 
-.clearRow {
+.tagList {
   display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-height: 92px;
+  margin: 0 -2px;
+  padding: 0 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.tagChip {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 30px;
+  gap: 5px;
+  max-width: 100%;
+  height: 22px;
   padding: 0 8px;
-  border: 0.5px solid var(--dsw-alias-border-l2);
-  border-radius: var(--dsw-radius-sm);
-  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-secondary);
   font: inherit;
   font-size: 11px;
+  line-height: 16px;
   cursor: pointer;
 }
 
-.clearRowOn {
-  border-color: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--dsw-alias-label-primary);
+.tagChipOn {
+  box-shadow: inset 0 0 0 1px var(--dsw-alias-label-primary);
   color: var(--dsw-alias-label-primary);
 }
 
-.plainDot {
-  width: 12px;
-  height: 12px;
-  border: 1.5px dashed var(--dsw-alias-label-tertiary);
+.tagChipDot {
+  flex: none;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
+}
+
+.tagChipLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nameLabel {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.nameInput {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 12px;
+}
+
+.nameInput::placeholder {
+  color: var(--dsw-alias-label-tertiary);
 }
 
 @media (hover: hover) {
   .tab:hover,
   .textButton:hover,
-  .clearRow:hover {
+  .tagChip:hover {
     color: var(--dsw-alias-label-primary);
   }
 
@@ -262,7 +311,8 @@
 .tab:focus-visible,
 .cell:focus-visible,
 .swatchButton:focus-visible,
-.clearRow:focus-visible,
+.tagChip:focus-visible,
+.nameInput:focus-visible,
 .textButton:focus-visible,
 .primaryButton:focus-visible,
 .search:focus-visible {

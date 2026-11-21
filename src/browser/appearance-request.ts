@@ -21,7 +21,7 @@ export type AppearanceRequest =
     readonly anchor?: AppearanceAnchor | undefined
   }
   | {
-    readonly kind: 'session-color'
+    readonly kind: 'session-tag'
     readonly sessionId: string
     readonly displayTitle: string
     readonly anchor?: AppearanceAnchor | undefined

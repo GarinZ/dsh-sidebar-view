@@ -386,14 +386,16 @@ function ProjectRow({
  * @param props.expanded - whether the bucket's rows render below it.
  * @param props.onToggle - fold or unfold the bucket.
  * @param props.rowKey - bucket key for the row's DOM identity.
+ * @param props.accent - tag colour, when the bucket is a tag.
  * @returns the bucket header row.
  */
-export function TimeBucketRowItem({ label, count, expanded, onToggle, rowKey }: {
+export function TimeBucketRowItem({ label, count, expanded, onToggle, rowKey, accent }: {
   label: string
   count: number
   expanded: boolean
   onToggle: () => void
   rowKey: string
+  accent?: string | undefined
 }) {
   return (
     <div
@@ -406,6 +408,9 @@ export function TimeBucketRowItem({ label, count, expanded, onToggle, rowKey }: 
       <span className={clsx(css.slot, css.chevron)}>
         <IconTriangleRightFillRegular className={clsx(css.arrow, expanded && css.arrowOpen)} />
       </span>
+      {accent !== undefined && (
+        <span className={css.bucketDot} style={{ backgroundColor: accent }} aria-hidden="true" />
+      )}
       <span className={css.projectText}>
         <span className={css.title}>{label}</span>
       </span>
@@ -487,6 +492,29 @@ function SessionStatusDots({ statuses }: { statuses: readonly [SessionStatus, ..
   return (
     <>
       <StateDot state={statuses[0].state} />
+      {statuses.map(status => (
+        <span className={css.visuallyHidden} key={status.label}>{status.label}</span>
+      ))}
+    </>
+  )
+}
+
+/**
+ * Tag marker: the Session's colour stays visible as a dot, and the live status
+ * rides around it as a ring — activity keeps its urgent hue without hiding the
+ * tag. Idle rows show the dot alone; status labels stay in the DOM either way.
+ */
+function SessionTagMarker({ accent, statuses }: {
+  accent: string
+  statuses: readonly [SessionStatus, ...SessionStatus[]]
+}) {
+  const state = statuses[0].state
+  return (
+    <>
+      <span className={css.tagMarker} data-state={state}>
+        <span className={css.tagMarkerDot} style={{ backgroundColor: accent }} aria-hidden="true" />
+        {state !== 'idle' && <span className={css.tagMarkerRing} aria-hidden="true" />}
+      </span>
       {statuses.map(status => (
         <span className={css.visuallyHidden} key={status.label}>{status.label}</span>
       ))}
@@ -769,11 +797,11 @@ export function SessionNodeItem({
           blank — the grayed row carries the archived look — and their live
           status stays on the hover card only. */}
       <span className={css.slot}>
-        {!row.archived && !row.blank && (showStatus
-          ? <SessionStatusDots statuses={statuses} />
-          : accent === undefined
-            ? renderSlot('sidebar.session.row.leading', { sessionId: node.id })
-            : <span className={css.sessionColorDot} style={{ backgroundColor: accent }} aria-hidden="true" />)}
+        {!row.archived && !row.blank && (accent !== undefined
+          ? <SessionTagMarker accent={accent} statuses={statuses} />
+          : showStatus
+            ? <SessionStatusDots statuses={statuses} />
+            : renderSlot('sidebar.session.row.leading', { sessionId: node.id }))}
       </span>
       <span
         ref={titleRef}

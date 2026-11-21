@@ -657,6 +657,110 @@ export function deriveTimeGroups(
   return groups
 }
 
+/** Group key for Sessions wearing no tag. */
+export const UNTAGGED_TAG_KEY = '__untagged__'
+
+/** The part of a tag the grouping pass needs; the picker adds storage fields. */
+export interface TagGroupTag {
+  readonly id: string
+  readonly name: string
+  readonly color: string
+}
+
+/** Session rows of one tag, or of the untagged bucket. */
+export interface TagGroupNode {
+  key: string
+  /** Tag id, or null for the untagged bucket. */
+  tagId: string | null
+  label: string
+  /** Palette id behind the header dot; absent on the untagged bucket. */
+  color?: string
+  /** Visible rows in the bucket. */
+  sessionCount: number
+  expanded: boolean
+  sessions: readonly SessionNode[]
+}
+
+/** Viewing state consumed by the tag derivation. */
+export interface TagView {
+  /** Tags in picker order; empty buckets do not render. */
+  tags: readonly TagGroupTag[]
+  /** Tag id by Session. */
+  sessionTags: Readonly<Record<string, string>>
+  /** Collapsed tag keys; omitted means every tag is open. */
+  expandedTags?: readonly string[]
+  /** Status tab; omitted reads as every Session. */
+  statusFilter?: SessionStatusFilter
+  /** Localized colour name, for a tag the user never named. */
+  colorLabel: (color: string) => string
+  /** Localized name of the bucket holding untagged Sessions. */
+  untaggedLabel: string
+}
+
+/**
+ * Derive the flattened Session list as named tags: defined tags in picker
+ * order, the untagged bucket last. Row order inside a bucket follows the
+ * caller order; unknown or cleared tag ids read as untagged. Empty buckets do
+ * not render.
+ * @param list - sessions list snapshot.
+ * @param sessionIds - complete account members in the selected order.
+ * @param rowState - registry-global pin and archive sets plus the archived filter.
+ * @param statuses - unified UI status by Session.
+ * @param view - tags, assignments, expansion, the status tab, and the two labels.
+ * @returns non-empty groups in render order.
+ */
+export function deriveTagGroups(
+  list: SessionListState,
+  sessionIds: readonly SessionId[],
+  rowState: SessionRowState,
+  statuses: SessionStatuses,
+  view: TagView,
+): TagGroupNode[] {
+  const rows = deriveFlat(list, sessionIds, rowState, statuses, view.statusFilter ?? 'all')
+  const known = new Map(view.tags.map(tag => [tag.id, tag]))
+  const byTag = new Map<string, SessionNode[]>()
+  const untagged: SessionNode[] = []
+  for (const row of rows) {
+    const tagId = view.sessionTags[row.id]
+    if (tagId === undefined || !known.has(tagId)) {
+      untagged.push(row)
+      continue
+    }
+    const bucket = byTag.get(tagId)
+    if (bucket === undefined) byTag.set(tagId, [row])
+    else bucket.push(row)
+  }
+  const expandedTags = view.expandedTags === undefined ? undefined : new Set(view.expandedTags)
+  const isExpanded = (key: string): boolean => expandedTags === undefined || expandedTags.has(key)
+  const groups: TagGroupNode[] = []
+  for (const tag of view.tags) {
+    const members = byTag.get(tag.id)
+    if (members === undefined || members.length === 0) continue
+    const expanded = isExpanded(tag.id)
+    groups.push({
+      key: tag.id,
+      tagId: tag.id,
+      label: tag.name.trim() === '' ? view.colorLabel(tag.color) : tag.name,
+      color: tag.color,
+      sessionCount: members.length,
+      expanded,
+      sessions: expanded ? members : [],
+    })
+  }
+  if (untagged.length > 0) {
+    const expanded = isExpanded(UNTAGGED_TAG_KEY)
+    groups.push({
+      key: UNTAGGED_TAG_KEY,
+      tagId: null,
+      label: view.untaggedLabel,
+      sessionCount: untagged.length,
+      expanded,
+      sessions: expanded ? untagged : [],
+    })
+  }
+  return groups
+}
+
 /**
  * Merge immediate title/Workspace/Session id substring matches with ranked Host content
  * matches. Local rows lead newest-first, content-only rows retain backend

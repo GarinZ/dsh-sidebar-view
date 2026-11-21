@@ -153,15 +153,61 @@
   color: var(--dsw-alias-state-business-primary);
 }
 
-/* A user glyph is content, not chrome: give it the stronger label tone so a
-   line icon reads at 16px instead of fading into the row. Emoji ignore it. */
+/* A user glyph sits in the folder's cell, so it wears the folder's tone; emoji
+   carry their own colours. */
 .folderCustom {
-  color: var(--dsw-alias-label-secondary);
+  color: var(--dsw-alias-label-tertiary);
 }
 
-/* Accent for a Session with no live status: same 16px cell, smaller dot so it
-   never competes with a real state dot beside it in the list. */
-.sessionColorDot {
+/* Tag marker: the tag colour is the dot, and a live status wraps around it as
+   a ring, so activity never hides which tag a Session wears. */
+.tagMarker {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+
+.tagMarkerDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.tagMarkerRing {
+  position: absolute;
+  inset: 1px;
+  border: 1.5px solid var(--dsw-alias-state-idle-primary);
+  border-radius: 50%;
+}
+
+.tagMarker[data-state='done'] .tagMarkerRing {
+  border-color: var(--dsw-alias-state-success-primary);
+}
+
+.tagMarker[data-state='warning'] .tagMarkerRing {
+  border-color: var(--dsw-alias-state-warn-primary);
+}
+
+.tagMarker[data-state='error'] .tagMarkerRing {
+  border-color: var(--dsw-alias-state-error-primary);
+}
+
+/* Running: an open arc spins instead of a solid ring. */
+.tagMarker[data-state='ongoing'] .tagMarkerRing {
+  border-color: var(--dsw-alias-label-tertiary);
+  border-right-color: transparent;
+  animation: tagMarkerSpin 1.5s linear infinite;
+}
+
+@keyframes tagMarkerSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Tag group headers repeat the tag's colour beside the bucket name. */
+.bucketDot {
   flex: none;
   width: 8px;
   height: 8px;
@@ -529,5 +575,10 @@
   .arrow {
     animation: none;
     transition: none;
+  }
+
+  .tagMarker[data-state='ongoing'] .tagMarkerRing {
+    animation: none;
+    border-right-color: var(--dsw-alias-label-tertiary);
   }
 }

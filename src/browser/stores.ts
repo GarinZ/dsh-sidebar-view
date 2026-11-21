@@ -18,9 +18,10 @@ export const FLAT_SESSION_ORDER_KEY = '__flat_session_order__'
 
 /**
  * Session-list grouping mode: sibling Workspace sections, a Workspace tree,
- * one flat list, or one flat list bucketed by update day.
+ * one flat list, one flat list bucketed by update day, or one bucketed by the
+ * Session's tag.
  */
-export type SessionGroupBy = 'workspace' | 'workspace-tree' | 'flat' | 'time'
+export type SessionGroupBy = 'workspace' | 'workspace-tree' | 'flat' | 'time' | 'tag'
 /** Session order: saved manual positions or current recency. */
 export type SessionOrderBy = 'manual' | 'updated'
 /**
@@ -75,6 +76,8 @@ type WorkspaceViewState = {
   statusFilter?: SessionStatusFilter
   /** Time buckets the user folded; absent keys stay open. */
   timeBucketExpansion: Record<string, boolean>
+  /** Tag groups the user folded, keyed by tag id or the untagged key. */
+  tagExpansion?: Record<string, boolean>
   /** Title/timestamp scale; omitted in older snapshots and read as 'normal'. */
   textScale?: TextScale
   /** Row-end Workspace name in the flattened views; omitted reads as off. */
@@ -119,6 +122,7 @@ type WorkspaceViewActions = {
   setArchivedFilter: (draft: WorkspaceViewState, filter: ArchivedFilter) => void
   setStatusFilter: (draft: WorkspaceViewState, filter: SessionStatusFilter) => void
   setTimeBucketExpanded: (draft: WorkspaceViewState, key: SessionTimeBucket, expanded: boolean) => void
+  setTagExpanded: (draft: WorkspaceViewState, key: string, expanded: boolean) => void
 }
 
 /** Copy read-only projections into the persisted mutable store representation. */
@@ -142,6 +146,7 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
       archivedFilter: 'default',
       statusFilter: 'all',
       timeBucketExpansion: {},
+      tagExpansion: {},
     }),
     persist: 'dsh.workspace.view.v5',
     actions: {
@@ -183,6 +188,9 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
       setStatusFilter: (d, filter: SessionStatusFilter) => { d.statusFilter = filter },
       setTimeBucketExpanded: (d, key: SessionTimeBucket, expanded: boolean) => {
         d.timeBucketExpansion = { ...d.timeBucketExpansion, [key]: expanded }
+      },
+      setTagExpanded: (d, key: string, expanded: boolean) => {
+        d.tagExpansion = { ...d.tagExpansion, [key]: expanded }
       },
     },
   })

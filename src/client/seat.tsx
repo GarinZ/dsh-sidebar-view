@@ -18,7 +18,9 @@
  */
 import * as React from 'react'
 import { MenuItemButton } from '@deepseek-ai/dsh-client-ui-primitives'
-import { isSessionColorId, parseIconSpec } from '../browser/appearance.ts'
+import {
+  isSessionColorId, MAX_TAG_NAME, parseIconSpec, readTagDefinitions, type TagDefinition,
+} from '../browser/appearance.ts'
 import { AppearanceIcon } from '../browser/appearance-icon.tsx'
 import { requestAppearance, type AppearanceAnchor } from '../browser/appearance-request.ts'
 import { WorkspaceBrowser } from '../browser/rows/WorkspaceBrowser.tsx'
@@ -82,8 +84,10 @@ type Plus = {
   showWorkspaceName: boolean
   /** Workspace id to an `emoji:` / `icon:` spec; absent means the shipped folder glyph. */
   workspaceIcons: Record<string, string>
-  /** Session id to a palette id; absent means no accent. */
-  sessionColors: Record<string, string>
+  /** Named color tags, in the order the picker lists them. */
+  tags: TagDefinition[]
+  /** Session id to tag id; absent means the Session is untagged. */
+  sessionTags: Record<string, string>
 }
 
 /** Enough for every Workspace/Session one person is likely to decorate, and a hard stop for a corrupt store. */
@@ -92,7 +96,31 @@ const MAX_APPEARANCE_ENTRIES = 400
 const PLUS_KEY = 'dsh.workspace.view.sidebar-view.v1'
 const PLUS_INIT: Plus = {
   timeMode: false, statusFilter: 'all', timeBucketExpansion: {}, textScale: 'normal', showWorkspaceName: false,
-  workspaceIcons: {}, sessionColors: {},
+  workspaceIcons: {}, tags: [], sessionTags: {},
+}
+
+/**
+ * Pre-tag snapshots stored a bare palette id per Session. Lift them into one
+ * unnamed tag per colour so the rows keep their dots, then drop the legacy
+ * field on the next write; a named tag is only ever created by the picker.
+ * @param legacy - the old `sessionColors` record.
+ * @returns migrated tags and their Session assignments.
+ */
+function migrateSessionColors(legacy: unknown): { tags: TagDefinition[]; sessionTags: Record<string, string> } {
+  const colors = readAppearanceRecord(legacy, isSessionColorId)
+  const tags: TagDefinition[] = []
+  const byColor = new Map<string, TagDefinition>()
+  const sessionTags: Record<string, string> = {}
+  for (const [sessionId, color] of Object.entries(colors)) {
+    let tag = byColor.get(color)
+    if (tag === undefined) {
+      tag = { id: `color-${color}`, name: '', color: color as TagDefinition['color'] }
+      byColor.set(color, tag)
+      tags.push(tag)
+    }
+    sessionTags[sessionId] = tag.id
+  }
+  return { tags, sessionTags }
 }
 
 /**
@@ -120,8 +148,14 @@ function readPlus(): Plus {
   try {
     const raw = globalThis.localStorage?.getItem(PLUS_KEY)
     if (raw === null || raw === undefined) return PLUS_INIT
-    const parsed = JSON.parse(raw) as Partial<Plus>
-    return {
+    const parsed = JSON.parse(raw) as Partial<Plus> & { sessionColors?: unknown }
+    // Tags replaced the bare per-Session palette ids; lift a pre-tag snapshot
+    // once and rewrite the record so the legacy field does not linger.
+    const storedTags = readTagDefinitions(parsed.tags)
+    const migrated = storedTags.length === 0 ? migrateSessionColors(parsed.sessionColors) : undefined
+    const tags = migrated?.tags ?? storedTags
+    const tagIds = new Set(tags.map(tag => tag.id))
+    const plus: Plus = {
       timeMode: parsed.timeMode === true,
       statusFilter: typeof parsed.statusFilter === 'string' ? parsed.statusFilter : 'all',
       timeBucketExpansion: typeof parsed.timeBucketExpansion === 'object' && parsed.timeBucketExpansion !== null
@@ -130,8 +164,13 @@ function readPlus(): Plus {
       textScale: isTextScale(parsed.textScale) ? parsed.textScale : PLUS_INIT.textScale,
       showWorkspaceName: parsed.showWorkspaceName === true,
       workspaceIcons: readAppearanceRecord(parsed.workspaceIcons, value => parseIconSpec(value) !== null),
-      sessionColors: readAppearanceRecord(parsed.sessionColors, isSessionColorId),
+      tags,
+      sessionTags: migrated?.sessionTags ?? readAppearanceRecord(parsed.sessionTags, value => tagIds.has(value)),
     }
+    if (migrated !== undefined) {
+      try { globalThis.localStorage?.setItem(PLUS_KEY, JSON.stringify(plus)) } catch { /* quota */ }
+    }
+    return plus
   } catch {
     return PLUS_INIT
   }
@@ -157,7 +196,7 @@ function setPlus(patch: Partial<Plus>): void {
  * ------------------------------------------------------------------ */
 
 const PICKED = [
-  'groupBy.time',
+  'groupBy.time', 'groupBy.tag',
   'timeBucket.pinned', 'timeBucket.today', 'timeBucket.yesterday', 'timeBucket.week', 'timeBucket.earlier',
   'statusTabs.label', 'statusTab.all', 'statusTab.running', 'statusTab.pending', 'statusTab.unread',
   'textSize.label', 'textSize.small', 'textSize.normal', 'textSize.large', 'viewOptions.showWorkspaceName',
@@ -166,6 +205,8 @@ const PICKED = [
   'appearance.icon.title', 'appearance.color.title', 'appearance.icon.hint', 'appearance.color.hint',
   'appearance.tab.emoji', 'appearance.tab.icon', 'appearance.search', 'appearance.noMatches',
   'appearance.reset', 'appearance.done', 'appearance.noColor',
+  'appearance.tag.name', 'appearance.tag.placeholder', 'appearance.tag.save',
+  'appearance.tag.create', 'appearance.tag.new', 'appearance.tag.untagged',
   'appearance.group.work', 'appearance.group.tech', 'appearance.group.nature', 'appearance.group.life',
   'appearance.group.create', 'appearance.group.misc', 'appearance.group.animals', 'appearance.group.food',
   'appearance.group.fun', 'appearance.group.symbols',
@@ -259,14 +300,14 @@ function PaletteIcon(): React.ReactElement {
  * dialog is not mounted inside a popover that is closing.
  * @param props - the row's Session identity and its menu's open state.
  */
-function SessionColorMenuItem(props: SessionColorItemProps & { t: Translate }): React.ReactElement {
+function SessionTagMenuItem(props: SessionColorItemProps & { t: Translate }): React.ReactElement {
   const { sessionId, displayTitle, t, useMenuOpenState } = props
   const [, setMenuOpen] = useMenuOpenState()
   return React.createElement(MenuItemButton, {
     icon: React.createElement(PaletteIcon),
     onSelect: () => {
       setMenuOpen(false)
-      requestAppearance({ kind: 'session-color', sessionId, displayTitle, anchor: anchorFor('session:' + sessionId) })
+      requestAppearance({ kind: 'session-tag', sessionId, displayTitle, anchor: anchorFor('session:' + sessionId) })
     },
   }, t('appearance.sessionColor'))
 }
@@ -335,7 +376,8 @@ function Seat(props: AnyProps & { Shipped: React.ComponentType<AnyProps> }): Rea
     textScale: plus.textScale,
     showWorkspaceName: plus.showWorkspaceName,
     workspaceIcons: plus.workspaceIcons,
-    sessionColors: plus.sessionColors,
+    tags: plus.tags,
+    sessionTags: plus.sessionTags,
   }), [shippedState, plus])
   const snapRef = React.useRef(snapshot)
   snapRef.current = snapshot
@@ -365,11 +407,26 @@ function Seat(props: AnyProps & { Shipped: React.ComponentType<AnyProps> }): Rea
       else next[workspaceId] = spec
       setPlus({ workspaceIcons: next })
     },
-    setSessionColor: (sessionId: string, color: string | null): void => {
-      const next = { ...plusState.sessionColors }
-      if (color === null) delete next[sessionId]
-      else next[sessionId] = color
-      setPlus({ sessionColors: next })
+    setSessionTag: (sessionId: string, tagId: string | null): void => {
+      const next = { ...plusState.sessionTags }
+      if (tagId === null) delete next[sessionId]
+      else next[sessionId] = tagId
+      setPlus({ sessionTags: next })
+    },
+    createTag: (sessionId: string, name: string, color: string): void => {
+      const id = `tag-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+      const tag: TagDefinition = { id, name: name.slice(0, MAX_TAG_NAME), color: color as TagDefinition['color'] }
+      setPlus({
+        tags: [...plusState.tags, tag],
+        sessionTags: { ...plusState.sessionTags, [sessionId]: id },
+      })
+    },
+    updateTag: (tagId: string, name: string, color: string): void => {
+      setPlus({
+        tags: plusState.tags.map(tag => (tag.id === tagId
+          ? { ...tag, name: name.slice(0, MAX_TAG_NAME), color: color as TagDefinition['color'] }
+          : tag)),
+      })
     },
   }), [shippedActions])
   const t = useCompositeT(rest.t)
@@ -423,8 +480,8 @@ export function apply(ctx: AnyCtx): void {
   // MenuItemButton so it inherits the menu's row metrics and focus handling.
   try {
     slots.inject('sidebar.workspaces.session.menu.item', () => slots.register(
-      { name: 'sidebar.workspaces.session.menu.item', id: 'dsh-sidebar-view-session-color', order: 250 },
-      (props: SessionColorItemProps) => React.createElement(SessionColorMenuItem, { ...props, t }),
+      { name: 'sidebar.workspaces.session.menu.item', id: 'dsh-sidebar-view-session-tag', order: 250 },
+      (props: SessionColorItemProps) => React.createElement(SessionTagMenuItem, { ...props, t }),
     ))
   } catch (error) {
     console.warn('[dsh-sidebar-view] shipped session menu slot unavailable', error)

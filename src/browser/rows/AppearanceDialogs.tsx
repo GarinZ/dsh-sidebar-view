@@ -11,8 +11,8 @@ import { createPortal } from 'react-dom'
 import { IconFolderOpenRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import clsx from 'clsx'
 import {
-  EMOJI_GROUPS, ICON_GROUPS, SESSION_COLORS, formatIconSpec, parseIconSpec, searchIcons, sessionColorHex,
-  type IconSpec,
+  EMOJI_GROUPS, ICON_GROUPS, MAX_TAG_NAME, SESSION_COLORS, formatIconSpec, parseIconSpec, searchIcons,
+  sessionColorHex, type IconSpec, type SessionColorId, type TagDefinition,
 } from '../appearance.ts'
 import { AppearanceIcon } from '../appearance-icon.tsx'
 import {
@@ -30,17 +30,26 @@ const VIEWPORT_MARGIN = 8
 export interface AppearanceDialogsProps {
   t: Translate
   workspaceIcons: Readonly<Record<string, string>>
-  sessionColors: Readonly<Record<string, string>>
+  tags: readonly TagDefinition[]
+  sessionTags: Readonly<Record<string, string>>
   onWorkspaceIcon: (workspaceId: string, spec: string | null) => void
-  onSessionColor: (sessionId: string, color: string | null) => void
+  /** Assign (or clear) the Session's tag. */
+  onAssignTag: (sessionId: string, tagId: string | null) => void
+  /** Create a named tag and assign it to the Session. */
+  onCreateTag: (sessionId: string, name: string, color: string) => void
+  /** Rename or recolor an existing tag; every Session wearing it follows. */
+  onUpdateTag: (tagId: string, name: string, color: string) => void
 }
 
 /**
  * @param props.t - the browser root's composite locale seat.
  * @param props.workspaceIcons - stored icon specs by Workspace id.
- * @param props.sessionColors - stored palette ids by Session id.
+ * @param props.tags - the named color tags in picker order.
+ * @param props.sessionTags - stored tag ids by Session id.
  * @param props.onWorkspaceIcon - write hop (null restores the folder glyph).
- * @param props.onSessionColor - write hop (null clears the accent).
+ * @param props.onAssignTag - write hop (null untags the Session).
+ * @param props.onCreateTag - write hop that adds a tag and wears it.
+ * @param props.onUpdateTag - write hop for the tag being edited.
  * @returns the popover the request store names, or null.
  */
 export function AppearanceDialogs(props: AppearanceDialogsProps) {
@@ -49,7 +58,7 @@ export function AppearanceDialogs(props: AppearanceDialogsProps) {
   const close = (): void => { requestAppearance(null) }
   return request.kind === 'workspace-icon'
     ? <WorkspaceIconPicker key={request.workspaceId} request={request} close={close} {...props} />
-    : <SessionColorPicker key={request.sessionId} request={request} close={close} {...props} />
+    : <SessionTagPicker key={request.sessionId} request={request} close={close} {...props} />
 }
 
 /**
@@ -59,6 +68,14 @@ export function AppearanceDialogs(props: AppearanceDialogsProps) {
  */
 function rowKeyOf(request: AppearanceRequest): string {
   return request.kind === 'workspace-icon' ? `workspace:${request.workspaceId}` : `session:${request.sessionId}`
+}
+
+/**
+ * Name a tag wears in the picker and in the group header: its own name, or the
+ * localized colour name for the unnamed tags the colour palette creates.
+ */
+function tagName(tag: TagDefinition, t: Translate): string {
+  return tag.name.trim() === '' ? t('appearance.color.' + tag.color) : tag.name
 }
 
 /** @param key - the row's data-row-key. @returns its viewport rect, or null when unmounted. */
@@ -301,53 +318,129 @@ function WorkspaceIconPicker({ request, close, t, workspaceIcons, onWorkspaceIco
 }
 
 /**
- * Nine-hue palette for one Session. The accent shows as the row's leading dot,
- * so picking one applies and dismisses — the row behind updates in place.
+ * Named colour tags for one Session. Picking a tag applies it and dismisses;
+ * the editor below renames or recolours the tag the Session already wears, so
+ * the row behind the popover updates as you type. The palette only stages a
+ * colour while a new tag is being created.
  */
-function SessionColorPicker({ request, close, t, sessionColors, onSessionColor }: {
-  request: Extract<AppearanceRequest, { kind: 'session-color' }>
+function SessionTagPicker({ request, close, t, tags, sessionTags, onAssignTag, onCreateTag, onUpdateTag }: {
+  request: Extract<AppearanceRequest, { kind: 'session-tag' }>
   close: () => void
   t: Translate
-  sessionColors: Readonly<Record<string, string>>
-  onSessionColor: AppearanceDialogsProps['onSessionColor']
+  tags: readonly TagDefinition[]
+  sessionTags: Readonly<Record<string, string>>
+  onAssignTag: AppearanceDialogsProps['onAssignTag']
+  onCreateTag: AppearanceDialogsProps['onCreateTag']
+  onUpdateTag: AppearanceDialogsProps['onUpdateTag']
 }) {
-  const current = sessionColors[request.sessionId]
-  const hex = sessionColorHex(current)
-  const choose = (color: string | null): void => {
-    onSessionColor(request.sessionId, color)
+  const currentId = sessionTags[request.sessionId]
+  const current = currentId === undefined ? undefined : tags.find(tag => tag.id === currentId)
+  const [mode, setMode] = React.useState<'edit' | 'create'>(current === undefined ? 'create' : 'edit')
+  const [name, setName] = React.useState(current?.name ?? '')
+  const [color, setColor] = React.useState<SessionColorId>(current?.color ?? 'blue')
+  const editing = mode === 'edit' && current !== undefined
+
+  const assign = (tag: TagDefinition): void => {
+    onAssignTag(request.sessionId, tag.id)
     close()
   }
+  const startCreate = (): void => {
+    setMode('create')
+    setName('')
+  }
+  const pickColor = (id: SessionColorId): void => {
+    setColor(id)
+    // Recolouring the tag the Session already wears is a live edit: every row
+    // in that group follows at once.
+    if (current !== undefined && mode === 'edit') onUpdateTag(current.id, current.name, id)
+  }
+  const commit = (): void => {
+    const trimmed = name.trim()
+    if (current !== undefined && mode === 'edit') onUpdateTag(current.id, trimmed, color)
+    else onCreateTag(request.sessionId, trimmed, color)
+    close()
+  }
+  const clear = (): void => {
+    onAssignTag(request.sessionId, null)
+    close()
+  }
+
   return (
     <PickerPopover request={request} title={t('appearance.color.title')} close={close}>
       <Head title={t('appearance.color.title')} scope={request.displayTitle} />
+      {tags.length > 0 && (
+        <div className={css.tagList} role="group" aria-label={t('appearance.color.title')}>
+          {tags.map(tag => {
+            const on = tag.id === currentId
+            return (
+              <button
+                key={tag.id}
+                type="button"
+                className={clsx(css.tagChip, on && css.tagChipOn)}
+                aria-pressed={on}
+                title={tagName(tag, t)}
+                onClick={() => { assign(tag) }}
+              >
+                <span className={css.tagChipDot} style={{ backgroundColor: sessionColorHex(tag.color) }} aria-hidden />
+                <span className={css.tagChipLabel}>{tagName(tag, t)}</span>
+              </button>
+            )
+          })}
+          {editing && (
+            <button type="button" className={css.tagChip} onClick={startCreate}>
+              + {t('appearance.tag.new')}
+            </button>
+          )}
+        </div>
+      )}
       <div className={css.swatches}>
-        {SESSION_COLORS.map(color => {
-          const on = current === color.id
-          const label = t('appearance.color.' + color.id)
+        {SESSION_COLORS.map(option => {
+          const on = color === option.id
+          const label = t('appearance.color.' + option.id)
           return (
             <button
-              key={color.id}
+              key={option.id}
               type="button"
               className={clsx(css.swatchButton, on && css.swatchOn)}
               aria-pressed={on}
               aria-label={label}
               title={label}
-              onClick={() => { choose(color.id) }}
+              onClick={() => { pickColor(option.id) }}
             >
-              <span className={css.swatch} style={{ backgroundColor: color.hex }} aria-hidden />
+              <span className={css.swatch} style={{ backgroundColor: option.hex }} aria-hidden />
             </button>
           )
         })}
       </div>
-      <button
-        type="button"
-        className={clsx(css.clearRow, hex === undefined && css.clearRowOn)}
-        aria-pressed={hex === undefined}
-        onClick={() => { choose(null) }}
-      >
-        <span className={css.plainDot} aria-hidden />
-        {t('appearance.noColor')}
-      </button>
+      <label className={css.nameRow}>
+        <span className={css.nameLabel}>{t('appearance.tag.name')}</span>
+        <input
+          className={css.nameInput}
+          value={name}
+          maxLength={MAX_TAG_NAME}
+          placeholder={t('appearance.tag.placeholder')}
+          aria-label={t('appearance.tag.name')}
+          onChange={event => { setName(event.currentTarget.value) }}
+          onKeyDown={event => {
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              commit()
+            }
+          }}
+        />
+      </label>
+      <footer className={css.footer}>
+        <button type="button" className={css.textButton} onClick={clear}>
+          {t('appearance.noColor')}
+        </button>
+        <span className={css.currentGlyph} aria-hidden>
+          <span className={css.swatch} style={{ backgroundColor: sessionColorHex(color) }} />
+        </span>
+        <button type="button" className={css.primaryButton} onClick={commit}>
+          {editing ? t('appearance.tag.save') : t('appearance.tag.create')}
+        </button>
+      </footer>
     </PickerPopover>
   )
 }
+
