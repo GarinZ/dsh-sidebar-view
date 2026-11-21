@@ -225,6 +225,7 @@ const PICKED = [
   'appearance.reset', 'appearance.done', 'appearance.noColor',
   'appearance.tag.name', 'appearance.tag.placeholder', 'appearance.tag.save',
   'appearance.tag.create', 'appearance.tag.new', 'appearance.tag.untagged',
+  'appearance.tag.delete', 'appearance.tag.confirmDelete',
   'appearance.group.work', 'appearance.group.tech', 'appearance.group.nature', 'appearance.group.life',
   'appearance.group.create', 'appearance.group.misc', 'appearance.group.animals', 'appearance.group.food',
   'appearance.group.fun', 'appearance.group.symbols',
@@ -449,6 +450,13 @@ function Seat(props: AnyProps & { Shipped: React.ComponentType<AnyProps> }): Rea
           ? { ...tag, name: name.slice(0, MAX_TAG_NAME), color: color as TagDefinition['color'] }
           : tag)),
       })
+    },
+    deleteTag: (tagId: string): void => {
+      const nextSessionTags = { ...plusState.sessionTags }
+      for (const [sessionId, id] of Object.entries(nextSessionTags)) {
+        if (id === tagId) delete nextSessionTags[sessionId]
+      }
+      setPlus({ tags: plusState.tags.filter(tag => tag.id !== tagId), sessionTags: nextSessionTags })
     },
   }), [shippedActions])
   const t = useCompositeT(rest.t)

@@ -1385,6 +1385,7 @@ export function WorkspaceBrowser({
     setSessionTag?: (sessionId: string, tagId: string | null) => void
     createTag?: (sessionId: string, name: string, color: string) => void
     updateTag?: (tagId: string, name: string, color: string) => void
+    deleteTag?: (tagId: string) => void
   }
   const groupExpansion = useStore(s => s.groupExpansion)
   const sessionOrderByAccount = useStore(s => s.sessionOrderByAccount)
@@ -1981,6 +1982,7 @@ export function WorkspaceBrowser({
         onAssignTag={(sessionId, tagId) => { appearanceActions.setSessionTag?.(sessionId, tagId) }}
         onCreateTag={(sessionId, name, color) => { appearanceActions.createTag?.(sessionId, name, color) }}
         onUpdateTag={(tagId, name, color) => { appearanceActions.updateTag?.(tagId, name, color) }}
+        onDeleteTag={tagId => { appearanceActions.deleteTag?.(tagId) }}
       />
     </div>
   )

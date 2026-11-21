@@ -165,6 +165,15 @@
   cursor: pointer;
 }
 
+.dangerButton {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.dangerArmed {
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 16%, transparent);
+  font-weight: 600;
+}
+
 .currentGlyph {
   display: inline-flex;
   align-items: center;

@@ -39,6 +39,8 @@ export interface AppearanceDialogsProps {
   onCreateTag: (sessionId: string, name: string, color: string) => void
   /** Rename or recolor an existing tag; every Session wearing it follows. */
   onUpdateTag: (tagId: string, name: string, color: string) => void
+  /** Drop a tag and untag every Session that wore it. */
+  onDeleteTag: (tagId: string) => void
 }
 
 /**
@@ -50,6 +52,7 @@ export interface AppearanceDialogsProps {
  * @param props.onAssignTag - write hop (null untags the Session).
  * @param props.onCreateTag - write hop that adds a tag and wears it.
  * @param props.onUpdateTag - write hop for the tag being edited.
+ * @param props.onDeleteTag - write hop that drops the tag being edited.
  * @returns the popover the request store names, or null.
  */
 export function AppearanceDialogs(props: AppearanceDialogsProps) {
@@ -323,7 +326,7 @@ function WorkspaceIconPicker({ request, close, t, workspaceIcons, onWorkspaceIco
  * the row behind the popover updates as you type. The palette only stages a
  * colour while a new tag is being created.
  */
-function SessionTagPicker({ request, close, t, tags, sessionTags, onAssignTag, onCreateTag, onUpdateTag }: {
+function SessionTagPicker({ request, close, t, tags, sessionTags, onAssignTag, onCreateTag, onUpdateTag, onDeleteTag }: {
   request: Extract<AppearanceRequest, { kind: 'session-tag' }>
   close: () => void
   t: Translate
@@ -332,6 +335,7 @@ function SessionTagPicker({ request, close, t, tags, sessionTags, onAssignTag, o
   onAssignTag: AppearanceDialogsProps['onAssignTag']
   onCreateTag: AppearanceDialogsProps['onCreateTag']
   onUpdateTag: AppearanceDialogsProps['onUpdateTag']
+  onDeleteTag: AppearanceDialogsProps['onDeleteTag']
 }) {
   const currentId = sessionTags[request.sessionId]
   const current = currentId === undefined ? undefined : tags.find(tag => tag.id === currentId)
@@ -339,6 +343,11 @@ function SessionTagPicker({ request, close, t, tags, sessionTags, onAssignTag, o
   const [name, setName] = React.useState(current?.name ?? '')
   const [color, setColor] = React.useState<SessionColorId>(current?.color ?? 'blue')
   const editing = mode === 'edit' && current !== undefined
+  // A tag is shared by every Session wearing it, so deleting asks once inside
+  // the popover instead of opening a second dialog. The ask stays put until the
+  // popover closes on its own: a timed disarm would silently turn a deliberate
+  // second click into a fresh ask, which reads as a dead button.
+  const [confirmDelete, setConfirmDelete] = React.useState(false)
 
   const assign = (tag: TagDefinition): void => {
     onAssignTag(request.sessionId, tag.id)
@@ -347,6 +356,7 @@ function SessionTagPicker({ request, close, t, tags, sessionTags, onAssignTag, o
   const startCreate = (): void => {
     setMode('create')
     setName('')
+    setConfirmDelete(false)
   }
   const pickColor = (id: SessionColorId): void => {
     setColor(id)
@@ -362,6 +372,15 @@ function SessionTagPicker({ request, close, t, tags, sessionTags, onAssignTag, o
   }
   const clear = (): void => {
     onAssignTag(request.sessionId, null)
+    close()
+  }
+  const remove = (): void => {
+    if (current === undefined) return
+    if (!confirmDelete) {
+      setConfirmDelete(true)
+      return
+    }
+    onDeleteTag(current.id)
     close()
   }
 
@@ -433,6 +452,15 @@ function SessionTagPicker({ request, close, t, tags, sessionTags, onAssignTag, o
         <button type="button" className={css.textButton} onClick={clear}>
           {t('appearance.noColor')}
         </button>
+        {editing && (
+          <button
+            type="button"
+            className={clsx(css.textButton, css.dangerButton, confirmDelete && css.dangerArmed)}
+            onClick={remove}
+          >
+            {confirmDelete ? t('appearance.tag.confirmDelete') : t('appearance.tag.delete')}
+          </button>
+        )}
         <span className={css.currentGlyph} aria-hidden>
           <span className={css.swatch} style={{ backgroundColor: sessionColorHex(color) }} />
         </span>
